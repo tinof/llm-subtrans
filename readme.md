@@ -482,7 +482,7 @@ Some additional arguments are available for specific providers.
 If you need to use proxy in your location, you can use socks proxy by using command line
 
 ```sh
-python3 gpt-subtrans.py <path_to_subtitle_file> --target_language <target_language> --proxy socks://127.0.0.1:1089
+gpt-subtrans <path_to_subtitle_file> --target_language <target_language> --proxy socks://127.0.0.1:1089
 ```
 Remember to change the local port to yours and turn on your proxy tools such as v2ray, naiveproxy and clash.
 
