@@ -31,6 +31,17 @@ claude = ["anthropic"]
 mistral = ["mistralai"]
 bedrock = ["boto3"]
 
+[project.scripts]
+llm-subtrans = "scripts.llm_subtrans:main"
+gpt-subtrans = "scripts.gpt_subtrans:main"
+gemini-subtrans = "scripts.gemini_subtrans:main"
+claude-subtrans = "scripts.claude_subtrans:main"
+deepseek-subtrans = "scripts.deepseek_subtrans:main"
+mistral-subtrans = "scripts.mistral_subtrans:main"
+bedrock-subtrans = "scripts.bedrock_subtrans:main"
+azure-subtrans = "scripts.azure_subtrans:main"
+batch-translate = "scripts.batch_translate:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["PySubtrans*", "scripts*"]

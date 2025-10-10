@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Assigning the script name and command file name
-script_name=$1.py
+# Script names use underscores, command names use hyphens
+script_base=$1
+script_name=$(echo "$script_base" | tr '-' '_').py
 cmd_name=$1.sh
 
 # Displaying the generation message

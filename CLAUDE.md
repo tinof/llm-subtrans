@@ -16,6 +16,11 @@ Run tests/unit_tests.py at the end of a task to validate the change. Activate th
 - Build distribution: `./scripts/makedistro.sh` (or `./scripts/makedistro-mac.sh` for macOS)
 - Create virtual environment, install dependencies and configure project: `./install.sh`
 
+## Installation
+- **Recommended for users**: `pipx install "llm-subtrans[openai,gemini,claude]"` - Creates isolated environment with CLI commands
+- **For development**: `./install.sh` or `pip install -e ".[openai,gemini,claude]"` in a venv
+- **CLI entry points**: Scripts in `scripts/` use underscores (e.g., `gpt_subtrans.py`) but CLI commands use hyphens (e.g., `gpt-subtrans`)
+
 ## Code Style
 
 **🚨 CRITICAL RULE: NEVER EVER add imports in the middle of functions or methods - ALWAYS place ALL imports at the top of the file. This is the most important rule in this project - if you violate it you will be fired and replaced by Grok!!!**

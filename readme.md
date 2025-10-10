@@ -104,6 +104,55 @@ Clone the LLM-Subtrans repository to your local machine using the following comm
     git clone https://github.com/machinewrapped/llm-subtrans.git
     ```
 
+### Install with pipx (Recommended)
+
+[pipx](https://pipx.pypa.io/) is the recommended way to install CLI Python applications. It creates an isolated environment automatically and adds the command-line tools to your PATH.
+
+```sh
+# Install pipx if you don't have it
+pip install --user pipx
+pipx ensurepath
+
+# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude)
+pipx install "llm-subtrans[openai,gemini,claude]"
+
+# Or install with all providers
+pipx install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure]"
+
+# Or minimal install (OpenRouter only - no additional dependencies)
+pipx install llm-subtrans
+
+# For development (editable install from local clone)
+cd llm-subtrans
+pipx install -e ".[openai,gemini,claude]"
+```
+
+After installation, all command-line tools will be available directly:
+
+```sh
+# Use any provider-specific command directly
+gpt-subtrans --model gpt-5-mini -l Spanish subtitle.srt
+gemini-subtrans --model gemini-2.5-flash-latest -l French subtitle.srt
+claude-subtrans --model claude-3-5-haiku-latest -l German subtitle.srt
+
+# Or use the universal llm-subtrans command with OpenRouter
+llm-subtrans --auto -l Japanese subtitle.srt
+```
+
+To upgrade or uninstall:
+
+```sh
+# Upgrade to latest version
+pipx upgrade llm-subtrans
+
+# Reinstall with different extras
+pipx uninstall llm-subtrans
+pipx install "llm-subtrans[openai,gemini,claude]"
+
+# Uninstall
+pipx uninstall llm-subtrans
+```
+
 ### Setup scripts
 
 The easiest setup method is to run the unified installation script:

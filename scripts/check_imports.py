@@ -7,11 +7,19 @@ def check_required_imports(modules: list[str], pip_extras: str|None = None) -> N
     for module_name in modules:
         if importlib.util.find_spec(module_name) is None:
             missing_modules.append(module_name)
-    
+
     if missing_modules:
-        print("Error: Required modules not found (installation method has changed)")
+        print("Error: Required modules not found")
+        print(f"Missing: {', '.join(missing_modules)}")
+        print()
         if pip_extras:
-            print(f"Please run the install script or `pip install .[{pip_extras}]`")
+            print("Installation options:")
+            print(f"  - pipx install 'llm-subtrans[{pip_extras}]'")
+            print(f"  - pip install '.[{pip_extras}]'")
+            print(f"  - Run ./install.sh and select the {pip_extras} provider")
         else:
-            print("Please run the install script or `pip install .`")
+            print("Installation options:")
+            print("  - pipx install llm-subtrans")
+            print("  - pip install .")
+            print("  - Run ./install.sh")
         sys.exit(1)
