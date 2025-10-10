@@ -26,7 +26,6 @@ LOCALES_DIR = os.path.join(REPO_ROOT, 'locales')
 POT_PATH = os.path.join(LOCALES_DIR, 'gui-subtrans.pot')
 
 INCLUDE_DIRS = (
-    'GuiSubtrans',
     'PySubtrans',
     'scripts',
 )

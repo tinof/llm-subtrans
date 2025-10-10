@@ -49,7 +49,7 @@ Subtitle format is auto-detected based on file extension or content.
 
 ### Working with a `SubtitleProject` with `init_project`
 
-`SubtitleProject` provides a high level interface for managing a translation job, with methods to read and write a project file to disk and event hooks on scene/batch translation. This is the framework that LLM-Subtrans and GUI-Subtrans use to manage translation workflows, but it is general enough that it could be used in other contexts.
+`SubtitleProject` provides a high level interface for managing a translation job, with methods to read and write a project file to disk and event hooks on scene/batch translation. This is the framework that LLM-Subtrans uses to manage translation workflows, but it is general enough that it could be used in other contexts.
 
 `init_project` instantiates a `SubtitleProject` and loads and prepares the source subtitles if a file path is supplied.
 
@@ -218,7 +218,6 @@ options = init_options(
 )
 ```
 
-Note that there are a number of options which are only used by the GUI-Subtrans application and have no function in PySubtrans.
 
 ## Advanced workflows
 
@@ -503,9 +502,9 @@ with SubtitleEditor(subtitles) as editor:
 print(f"Final state: {subtitles.scenecount} scenes, {subtitles.linecount} lines")
 ```
 
-## Learning from LLM-Subtrans and GUI-Subtrans
+## Learning from LLM-Subtrans
 
-There are many possible and correct ways to use PySubtrans. [LLM-Subtrans](https://github.com/machinewrapped/llm-subtrans) and [GUI-Subtrans](https://github.com/machinewrapped/llm-subtrans/tree/main/GuiSubtrans) provide two complete end-to-end examples that use PySubtrans in different ways, making use of different workflows and features. They can be used as a reference when integrating PySubtrans into your application if you want to use more advanced features.
+[LLM-Subtrans](https://github.com/machinewrapped/llm-subtrans) provides a complete end-to-end example of using PySubtrans in a CLI workflow. It can be used as a reference when integrating PySubtrans into your application if you want to use more advanced features.
 
 ### Batch automation example
 

@@ -1,20 +1,20 @@
-# LLM-Subtrans Architecture
+# LLM-Subtrans Architecture (CLI Edition)
 
 ```mermaid
 graph TD
-    Scripts[scripts] --> GuiSubtrans[GuiSubtrans]
-    Scripts --> PySubtrans[PySubtrans]
-    GuiSubtrans --> PySubtrans
+    Scripts[scripts] --> PySubtrans[PySubtrans]
 ```
 
 This document helps developers understand where to find code and how components interact when working on the codebase.
+
+**Note:** This is a CLI-only fork for Linux/macOS. All GUI and Windows-specific components have been removed.
 
 ## Entry Points
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/gui-subtrans.py` | Launches GUI, loads persistent settings, initializes translation providers |
 | `scripts/llm-subtrans.py` | CLI translator - loads subtitle file, translates using specified provider/model, saves results |
+| `scripts/batch-translate.py` | Batch translation script for processing multiple files |
 
 ## Module Structure
 
@@ -41,15 +41,6 @@ Subtitle files are processed through a pluggable system:
 - `SubtitleFileHandler` implementations read and write specific formats while exposing a common interface.
 - `SubtitleFormatRegistry` loads handlers from `PySubtrans/Formats/` and maps file extensions to the appropriate handler based on priority.
 - `SubtitleProject` uses the registry to detect formats from filenames and can convert subtitles when the output extension differs from the source.
-
-### GuiSubtrans (User Interface)
-PySide6-based interface using MVVM pattern. Work here for UI features, dialogs, and user interactions.
-
-### Key Classes
-- `ProjectDataModel` – State management and synchronization layer
-- `ProjectViewModel` – Qt model mapping project data to UI views (scenes → batches → lines)
-- `CommandQueue` – executes operations asynchronously with undo/redo support
-- `GuiSubtrans/Widgets/*` - Various custom widgets for forms, editors, and views
 
 ## Data Organization
 
@@ -97,31 +88,7 @@ The command-line interface provides simple synchronous processing of a source fi
 1. **Argument parsing** – allows configuration via command line arguments.
 2. **Options creation** – Parsed arguments and environment variables are merged to produce an `Options` instance that configures the translation flow.
 3. **Project initialization** – `CreateProject` loads the source subtitles and prepares them for translation, and initialises a `SubtitleTranslator`, optionally reading/writing a project file.
-5. **Completion** the resulting translation is saved, and the optional project file is updated.
-
-## GUI Architecture
-
-The GUI is built using PySide6 and follows a Model-View-ViewModel (MVVM) like pattern.
-
-### ProjectDataModel
-This class acts as a bridge between the core `SubtitleProject` and the `ProjectViewModel`. It holds the current project, the project options, and the current translation provider. It's responsible for creating the `ProjectViewModel` and for applying updates to it.
-
-### ProjectViewModel
-A custom `QStandardItemModel` that serves as the source for the various views in the GUI. It holds a tree of `SceneItem`, `BatchItem`, and `LineItem` objects, which mirror the structure of the `Subtitles` data.
-
-It has an update queue to handle asynchronous updates, ensuring that the GUI is updated in a thread-safe manner.
-
-### Views
-The GUI is composed of several views, such as the `ScenesView`, `SubtitleView`, and `LogWindow`, which are all subclasses of `QWidget`. 
-
-These views are responsible for displaying the data from the `ProjectViewModel` and for handling user input.
-
-### Command Queue
-GUI operations use the Command pattern for background execution and undo/redo support:
-
-- **CommandQueue** – executes commands on background `QThreadPool`, manages concurrency and synchronisation
-- **Commands** – in `GuiSubtrans/Commands/`, encapsulate operations (translation, file I/O, etc.)
-- **Undo/Redo** – maintained via `undo_stack` and `redo_stack`
+4. **Completion** the resulting translation is saved, and the optional project file is updated.
 
 ## Settings Management
 Application settings are managed through a layered system:
@@ -129,69 +96,12 @@ Application settings are managed through a layered system:
 **`SettingsType`** - generic type-safe settings container
 - Provides typed getters (`get_str`, `get_int`, `get_bool`) and convenience properties
 
-**`PySubtrans.Options`** 
+**`PySubtrans.Options`**
 - application-specific `SettingsType`
 - Provides default values for all application settings
 - Loads settings from a `settings.json` file
 - Import settings from environment variables and command line arguments
 - Supports project-specific and provider-specific settings
-
-## GUI Widget Architecture
-
-### The `ModelView`
-The central widget for displaying project data is the `GuiSubtrans.Widgets.ModelView`. It is a container widget that uses a `QSplitter` to arrange three main components:
-
-#### `ProjectSettings`
-A form for editing project-specific settings. It is displayed when the user clicks on the "Settings" button in the `ProjectToolbar`.
-
-#### ScenesView
-A `QTreeView` that displays the scenes and batches from the `ProjectViewModel`. This lets users view the high level status of a translation job.
-
-#### ContentView
-A container widget that dynamically adapts based on the selected scene(s) and batch(es), to show:
-
-**`SubtitleView`** individual lines, aligning original and translated content.
-
-**`SelectionView`** provides contextual information and actions.
-
-#### Editors and Dialogs
-`GuiSubtrans.Widgets.Editors` contains various widgets for editing scenes, batches, and individual subtitle lines, shown when a user double-clicks on an item in the `ScenesView` or `SubtitleView`. 
-
-### Settings Dialog Architecture
-
-`SettingsDialog` provides access to the global and provider-specific configuration settings.
-
-#### Schema-driven UI
-The structure of the `SettingsDialog` is defined by the `SECTIONS` dictionary, which defines the tabs and their contents as a nested dictionary of setting keys and their types along with an optional tooltip. e.g.
-
-```python
-'General': {
-    'ui_language': (str, _("The language of the application interface")),
-    'target_language': (str, _("The default language to translate the subtitles to")),
-    # ...
-},
-```
-
-This structure is used to build the form, with the `OptionsWidgets.CreateOptionWidget` factory function creating an appropriate widget for each setting based on its type.
-
-#### Conditional visibility
-Settings can be conditionally visible on other settings, using a data-driven system defined by the `VISIBILITY_DEPENDENCIES` property.
-
-#### Provider pluggability
-The "Provider Settings" tab dynamically populates with options specific to the selected translation provider. Each provider defines its own settings schema via a virtual `GetOptions` method, which is then used to populate the form.
-
-## Real-time UI Updates
-Translation operations can take minutes, but users need feedback and the ability to continue working.
-
-### ModelUpdate Pattern
-Commands can send incremental UI updates during execution via `ModelUpdate` objects.
-
-For example, `TranslateSceneCommand` subscribes to `SubtitleTranslator` events. Each time a batch completes, it emits a `ModelUpdate` with the translation data.
-
-1. Command creates `ModelUpdate` and sends to `ProjectDataModel`
-2. `ProjectDataModel` queues update and emits `updatesPending` signal
-3. `ProjectViewModel.ProcessUpdates()` applies changes on main thread
-4. Views automatically reflect updated data through Qt's model/view system
 
 ## Translation Provider Architecture
 The application supports multiple translation services through a provider system.
@@ -262,10 +172,8 @@ The specific format for translation requests can vary by provider and responses 
 
 - **New file formats** → `PySubtrans/Formats/` (add file handler, extend `SubtitleFileHandler`, add import to `__init__.py`)
 - **Translation providers** → `PySubtrans/Providers/` (subclass `TranslationProvider` and `TranslationClient`, add import to `__init__.py`)
-- **GUI features** → `GuiSubtrans/Widgets/` (new views/dialogs), `GuiSubtrans/Commands/` (new operations)
-- **Settings** → update `Options` schema, add to `SettingsDialog.SECTIONS`
-- **Background operations** → implement `Command` pattern in `GuiSubtrans/Commands/` for thread safety and undo support
+- **Settings** → update `Options` schema and default values
+- **CLI scripts** → add new scripts in `scripts/` directory for additional functionality
 
 **Key principles:**
-- All operations that modify project data must go through the `CommandQueue` to maintain thread safety and undo/redo functionality.
-- All subtitle mutations should use a `SubtitleEditor` for lock management.
+- All subtitle mutations should use a `SubtitleEditor` for lock management and thread safety.

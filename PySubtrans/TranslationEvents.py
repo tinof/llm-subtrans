@@ -27,8 +27,8 @@ class TranslationEvents:
         scene_translated(sender, scene): 
             Emitted when a complete scene has been translated
 
-        preprocessed(sender, scenes): 
-            Emitted after subtitles are batched and pre-processed (GuiSubtrans only)
+        preprocessed(sender, scenes):
+            Emitted after subtitles are batched and pre-processed
 
         error(sender, message): 
             Signals that an error was encountered during translation

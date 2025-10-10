@@ -1,23 +1,20 @@
-# LLM-Subtrans Development Guide
+# LLM-Subtrans Development Guide (CLI Edition)
+
+**Note:** This is a CLI-only fork for Linux/macOS. All GUI and Windows-specific components have been removed.
 
 Project uses Python 3.10+. NEVER import or use deprecated typing members like List, Union or Iterator.
 
-GUI framework is PySide6, be sure to use the correct syntax (e.g. scoped enum values).
-
 Secrets are stored in a .env file - NEVER read the contents of the file.
 
-Run tests\unit_tests.py at the end of a task to validate the change, unless it purely touched UI code (the GUI is not covered by unit tests). Activate the envsubtrans virtual environment first.
-
-## Console Output
-Avoid Unicode characters (✓ ✗) in print/log messages as these trigger Windows console errors
+Run tests/unit_tests.py at the end of a task to validate the change. Activate the envsubtrans virtual environment first.
 
 ## Commands
-- **IMPORTANT**: Always use the virtual environment Python: `./envsubtrans/Scripts/python.exe` (Windows) or `./envsubtrans/bin/python` (Linux/Mac)
-- Run all unit tests: `./envsubtrans/Scripts/python.exe tests/unit_tests.py`
-- Run single test: `./envsubtrans/Scripts/python.exe -m unittest PySubtrans.UnitTests.test_MODULE` or `./envsubtrans/Scripts/python.exe -m unittest GuiSubtrans.UnitTests.test_MODULE`
-- Run full test suite: `./envsubtrans/Scripts/python.exe scripts/run_tests.py`
-- Build distribution: `./scripts/makedistro.sh` (Linux/Mac) or `scripts\makedistro.bat` (Windows)
-- Create virtual environment, install dependencies and configure project: `./install.sh` (Linux/Mac) or `install.bat` (Windows)
+- **IMPORTANT**: Always use the virtual environment Python: `./envsubtrans/bin/python`
+- Run all unit tests: `./envsubtrans/bin/python tests/unit_tests.py`
+- Run single test: `./envsubtrans/bin/python -m unittest PySubtrans.UnitTests.test_MODULE`
+- Run full test suite: `./envsubtrans/bin/python scripts/run_tests.py`
+- Build distribution: `./scripts/makedistro.sh` (or `./scripts/makedistro-mac.sh` for macOS)
+- Create virtual environment, install dependencies and configure project: `./install.sh`
 
 ## Code Style
 

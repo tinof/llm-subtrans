@@ -1,21 +1,18 @@
-# LLM-Subtrans Development Guide
+# LLM-Subtrans Development Guide (CLI Edition)
+
+**Note:** This is a CLI-only fork for Linux/macOS. All GUI and Windows-specific components have been removed.
 
 Project uses Python 3.10+. NEVER import or use deprecated typing members like List, Union or Iterator.
-
-GUI framework is PySide6, be sure to use the correct syntax (e.g. scoped enum values).
 
 Secrets are stored in a .env file - NEVER read the contents of the file.
 
 Always run the unit_tests at the end of a task to validate any changes to the code.
 
-## Console Output
-**IMPORTANT** Avoid Unicode characters (✓ ✗) in log messages as these trigger Windows console errors
-
 ## Commands
 - Always activate the virtual environment first (e.g. `./envsubtrans/bin/activate`)
-- Run all unit tests: `python tests/unit_tests.py` 
-- Run single test: `python -m unittest PySubtrans.UnitTests.test_MODULE` or `python -m unittest GuiSubtrans.UnitTests.test_MODULE`
-- Build distribution: `./scripts/makedistro.sh` (Linux/Mac) or `scripts\makedistro.bat` (Windows)
+- Run all unit tests: `python tests/unit_tests.py`
+- Run single test: `python -m unittest PySubtrans.UnitTests.test_MODULE`
+- Build distribution: `./scripts/makedistro.sh` (or `./scripts/makedistro-mac.sh` for macOS)
 
 ## Code Style
 **🚨 CRITICAL RULE: NEVER add imports in the middle of functions or methods - ALL imports MUST be at the top of the file.**

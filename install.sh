@@ -106,18 +106,7 @@ source envsubtrans/bin/activate
 extras=()
 scripts_to_generate=("llm-subtrans" "batch-translate")
 
-echo "Select installation type:"
-echo "1 = Install with GUI"
-echo "2 = Install command line tools only"
-read -p "Enter your choice (1/2): " install_choice
-
-if [ "$install_choice" = "2" ]; then
-    echo "Installing command line modules..."
-else
-    echo "Including GUI modules..."
-    extras+=("gui")
-    scripts_to_generate+=("gui-subtrans")
-fi
+echo "Installing command line modules..."
 
 # Optional: configure OpenRouter API key
 echo "Optional: Configure OpenRouter API key (default provider)"

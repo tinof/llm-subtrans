@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-subtrans"
 version = "1.5.4"
-description = "Subtitle translation tools using large language models"
+description = "CLI subtitle translation tool using large language models (Linux/macOS)"
 readme = "readme.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -24,10 +24,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gui = [
-    "darkdetect",
-    "pyside6"
-]
 openai = ["openai"]
 azure = ["openai"]
 gemini = ["google-genai", "google-api-core"]
@@ -37,5 +33,5 @@ bedrock = ["boto3"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["PySubtrans*", "GuiSubtrans*", "scripts*"]
+include = ["PySubtrans*", "scripts*"]
 namespaces = true
