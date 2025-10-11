@@ -18,8 +18,10 @@ Run tests/unit_tests.py at the end of a task to validate the change. Activate th
 
 ## Installation
 - **Recommended for users**: `pipx install "llm-subtrans[openai,gemini,claude]"` - Creates isolated environment with CLI commands
+- **With MKV extraction support**: `pipx install "llm-subtrans[mkv,openai,gemini,claude]"` - Includes exsubs for extracting and translating MKV subtitles
 - **For development**: `./install.sh` or `pip install -e ".[openai,gemini,claude]"` in a venv
 - **CLI entry points**: Scripts in `scripts/` use underscores (e.g., `gpt_subtrans.py`) but CLI commands use hyphens (e.g., `gpt-subtrans`)
+- **MKV extraction**: Requires mkvtoolnix package (provides mkvmerge and mkvextract commands)
 
 ## Code Style
 
@@ -55,6 +57,19 @@ Run tests/unit_tests.py at the end of a task to validate the change. Activate th
   - **Exception Tests**: Guard with `skip_if_debugger_attached` decorator for debugging compatibility
     - Use `log_input_expected_error(input, ExpectedException, actual_exception)` for exception logging
   - **None Safety**: Use `.get(key, default)` with appropriate default values to avoid Pylance warnings, or assert then test for None values.
+
+## MKV Extraction Feature
+
+The `PySubtrans/MKV` module provides automatic subtitle extraction from MKV files:
+
+- **PySubtrans/MKV/VideoFile.py**: Parses season/episode numbers from filenames for sorting
+- **PySubtrans/MKV/Config.py**: Translation mode configuration and language mappings
+- **PySubtrans/MKV/SubtitleFilter.py**: Encoding detection, UTF-8 conversion, and subtitle filtering
+- **PySubtrans/MKV/MKVExtractor.py**: Intelligent track selection and extraction using mkvmerge/mkvextract
+- **PySubtrans/MKV/Diagnostics.py**: System diagnostics for I/O performance testing
+- **scripts/exsubs.py**: CLI entry point for extracting and translating MKV subtitles using PySubtrans API
+
+The exsubs script integrates directly with PySubtrans using `Options`, `SubtitleProject`, `batch_subtitles`, and `init_translator`. It supports all translation providers (Gemini, ChatGPT, Claude, DeepSeek) through the `--gemini`, `--gpt`, `--claude`, and `--deepseek` flags.
 
 ## Information
 Consult `docs/architecture.md` for detailed information on the project architecture and components.

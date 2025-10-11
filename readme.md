@@ -116,6 +116,9 @@ pipx ensurepath
 # Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude)
 pipx install "llm-subtrans[openai,gemini,claude]"
 
+# Install with MKV extraction support (requires mkvtoolnix)
+pipx install "llm-subtrans[mkv,openai,gemini,claude]"
+
 # Or install with all providers
 pipx install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure]"
 
@@ -137,6 +140,9 @@ claude-subtrans --model claude-3-5-haiku-latest -l German subtitle.srt
 
 # Or use the universal llm-subtrans command with OpenRouter
 llm-subtrans --auto -l Japanese subtitle.srt
+
+# Extract and translate subtitles from MKV files (requires [mkv] extras and mkvtoolnix)
+exsubs video.mkv --gemini -l Finnish
 ```
 
 To upgrade or uninstall:
@@ -250,6 +256,12 @@ llm-subtrans -s <server_address> -e <endpoint> -k <api_key> -l <language> <path_
 gpt-subtrans --model gpt-5-mini --target_language <target_language> <path_to_subtitle_file>
 gemini-subtrans --model gemini-2.5-flash-latest --target_language <target_language> <path_to_subtitle_file>
 claude-subtrans --model claude-3-5-haiku-latest --target_language <target_language> <path_to_subtitle_file>
+
+# Extract and translate subtitles from MKV files (requires mkvtoolnix)
+exsubs video.mkv --gemini -l Finnish              # Process single MKV file
+exsubs --gemini -l Finnish                        # Process all MKV files in current directory
+exsubs video.mkv --gpt -l Spanish -i              # Interactive track selection
+exsubs --diagnose                                 # Run system diagnostics
 
 # List supported subtitle formats
 llm-subtrans --list-formats

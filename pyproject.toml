@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-subtrans"
-version = "1.5.4"
-description = "CLI subtitle translation tool using large language models (Linux/macOS)"
+version = "1.6.0"
+description = "CLI subtitle translation tool with MKV extraction using large language models (Linux/macOS)"
 readme = "readme.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -30,6 +30,7 @@ gemini = ["google-genai", "google-api-core"]
 claude = ["anthropic"]
 mistral = ["mistralai"]
 bedrock = ["boto3"]
+mkv = ["subtitle_filter", "chardet", "filelock", "rich"]
 
 [project.scripts]
 llm-subtrans = "scripts.llm_subtrans:main"
@@ -41,6 +42,7 @@ mistral-subtrans = "scripts.mistral_subtrans:main"
 bedrock-subtrans = "scripts.bedrock_subtrans:main"
 azure-subtrans = "scripts.azure_subtrans:main"
 batch-translate = "scripts.batch_translate:main"
+exsubs = "scripts.exsubs:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
