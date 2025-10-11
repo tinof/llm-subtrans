@@ -1,4 +1,7 @@
-# LLM-Subtrans
+# LLM-Subtrans (CLI Edition)
+
+**A command-line subtitle translator for Linux and macOS using LLMs**
+
 LLM-Subtrans is an open source subtitle translator that uses LLMs as a translation service. It can translate subtitles between any language pairs supported by the language model.
 
 The application supports multiple subtitle formats through a pluggable system. Currently `.srt`, `.ssa`/`.ass` and `.vtt` files are supported.
@@ -6,18 +9,57 @@ The application supports multiple subtitle formats through a pluggable system. C
 Note: LLM-Subtrans requires an active internet connection. Subtitles are sent to the provider's servers for translation, so their privacy policy applies.
 
 ## Installation
-For most users the packaged release is the easiest way to use the program. Download a package from [the releases page](https://github.com/machinewrapped/llm-subtrans/releases), unzip to a folder and run `gui-subtrans`. You will be prompted for some basic settings on first run.
 
-If you want to use the command line tools, modify the code or just prefer to have more control over the setup you will need to [install from source](#installing-from-source).
+### Quick Install with pipx (Recommended)
 
-### Windows
-Every release is packaged for Windows as (**gui-subtrans-x.x.x.zip**).
+[pipx](https://pipx.pypa.io/) is the recommended way to install CLI Python applications. It creates an isolated environment automatically and adds the command-line tools to your PATH.
 
-### MacOS
-Packaged builds are (usually) provided for MacOS with Apple Silicon (**gui-subtrans-x.x.x.macos-arm64.zip**). If you have an Intel Mac you will need to [install from source](#installing-from-source).
+```sh
+# Install pipx if you don't have it
+pip install --user pipx
+pipx ensurepath
 
-### Linux
-Prebuilt Linux packages are not provided so you will need to [install from source](#installing-from-source).
+# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude)
+pipx install "llm-subtrans[openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
+
+# Install with MKV extraction support (requires mkvtoolnix)
+pipx install "llm-subtrans[mkv,openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
+
+# Or install with all providers
+pipx install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure] @ git+https://github.com/tinof/llm-subtrans.git"
+
+# Or minimal install (OpenRouter only - no additional dependencies)
+pipx install "llm-subtrans @ git+https://github.com/tinof/llm-subtrans.git"
+```
+
+After installation, all command-line tools will be available directly:
+
+```sh
+# Use any provider-specific command directly
+gpt-subtrans --model gpt-5-mini -l Spanish subtitle.srt
+gemini-subtrans --model gemini-2.5-flash-latest -l French subtitle.srt
+claude-subtrans --model claude-3-5-haiku-latest -l German subtitle.srt
+
+# Or use the universal llm-subtrans command with OpenRouter
+llm-subtrans --auto -l Japanese subtitle.srt
+
+# Extract and translate subtitles from MKV files (requires [mkv] extras and mkvtoolnix)
+exsubs video.mkv --gemini -l Finnish
+```
+
+To upgrade or uninstall:
+
+```sh
+# Upgrade to latest version
+pipx upgrade llm-subtrans
+
+# Reinstall with different extras
+pipx uninstall llm-subtrans
+pipx install "llm-subtrans[openai,gemini,claude]"
+
+# Uninstall
+pipx uninstall llm-subtrans
+```
 
 ## Translation Providers
 
@@ -26,7 +68,7 @@ https://openrouter.ai/privacy
 
 [OpenRouter](https://openrouter.ai/) is a service which aggregates [models](https://openrouter.ai/models) from a wide range of providers. You will need an [OpenRouter API Key](https://openrouter.ai/settings/keys) to use the service, and a credit balance (though some quite capable models are provided free of charge).
 
-You can choose to let OpenRouter select the model automatically (the "Use Default Model" setting in the GUI or `--auto` on the command line) or you can specify a specific model. Model preferences can also be specified in the OpenRouter dashboard.
+You can choose to let OpenRouter select the model automatically (using the `--auto` flag) or you can specify a specific model. Model preferences can also be specified in the OpenRouter dashboard.
 
 Since hundreds of models are available they are grouped by model family. By default the list of available models is pulled from the "Translation" category, though this excludes many models that are perfectly capable of translation (including most free options).
 
@@ -84,93 +126,41 @@ LLM-Subtrans can interface directly with any server that supports an OpenAI comp
 
 This is mainly for research and you should not expect particularly good results from local models. LLMs derive much of their power from their size, so the small, quantized models you can run on a consumer GPU are likely to produce poor translations, fail to generate valid responses or get stuck in endless loops. If you find a model that reliably producess good results, please post about it in the Discussions area!
 
-Chat and completion endpoints are supported - you should configure the settings and endpoint based on the model the server is running (e.g. instruction tuned models will probably produce better results using the completions endpoint rather than chat). The prompt template can be edited in the GUI if you are using a model that requires a particular format - make sure to include at least the {prompt} tag in the template, as this is where the subtitles that need translating in each batch will be filled in!
+Chat and completion endpoints are supported - you should configure the settings and endpoint based on the model the server is running (e.g. instruction tuned models will probably produce better results using the completions endpoint rather than chat).
 
 ### Amazon Bedrock
 https://aws.amazon.com/service-terms/
 
-**Bedrock is not recommended for most users**: The setup process is complex, requiring AWS credentials, proper IAM permissions, and region configuration. Additionally, not all models on Bedrock support translation tasks or offer reliable results. Bedrock support will not be included in pre-packaged versions - if you can handle setting up AWS, you can handle installing llm-subtrans [from source](#installing-from-source).
+**Bedrock is not recommended for most users**: The setup process is complex, requiring AWS credentials, proper IAM permissions, and region configuration. Additionally, not all models on Bedrock support translation tasks or offer reliable results.
 
 To use Bedrock, you must:
   1. Create an **IAM user** or **role** with appropriate permissions (e.g., `bedrock:InvokeModel`, `bedrock:ListFoundationModels`).
   2. Ensure the model you wish to use is accessible in your selected AWS region and [enabled for the IAM user](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html).
 
-## Installing from source
-If you want to use the command line tools or modify the program, you will need to have Python 3.10+ and pip installed on your system, then follow these steps.
+### Development Installation
 
-Clone the LLM-Subtrans repository to your local machine using the following command or your preferred tool:
+For development or if you prefer more control over the setup, you'll need Python 3.10+ and pip installed.
 
-    ```sh
-    git clone https://github.com/machinewrapped/llm-subtrans.git
-    ```
-
-### Install with pipx (Recommended)
-
-[pipx](https://pipx.pypa.io/) is the recommended way to install CLI Python applications. It creates an isolated environment automatically and adds the command-line tools to your PATH.
+Clone the repository:
 
 ```sh
-# Install pipx if you don't have it
-pip install --user pipx
-pipx ensurepath
-
-# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude)
-pipx install "llm-subtrans[openai,gemini,claude]"
-
-# Install with MKV extraction support (requires mkvtoolnix)
-pipx install "llm-subtrans[mkv,openai,gemini,claude]"
-
-# Or install with all providers
-pipx install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure]"
-
-# Or minimal install (OpenRouter only - no additional dependencies)
-pipx install llm-subtrans
-
-# For development (editable install from local clone)
+git clone https://github.com/tinof/llm-subtrans.git
 cd llm-subtrans
-pipx install -e ".[openai,gemini,claude]"
 ```
 
-After installation, all command-line tools will be available directly:
+#### Option 1: Using install.sh (Recommended for Development)
+
+The `install.sh` script will create a virtual environment and install dependencies:
 
 ```sh
-# Use any provider-specific command directly
-gpt-subtrans --model gpt-5-mini -l Spanish subtitle.srt
-gemini-subtrans --model gemini-2.5-flash-latest -l French subtitle.srt
-claude-subtrans --model claude-3-5-haiku-latest -l German subtitle.srt
-
-# Or use the universal llm-subtrans command with OpenRouter
-llm-subtrans --auto -l Japanese subtitle.srt
-
-# Extract and translate subtitles from MKV files (requires [mkv] extras and mkvtoolnix)
-exsubs video.mkv --gemini -l Finnish
+./install.sh
 ```
 
-To upgrade or uninstall:
+This creates a virtual environment in `envsubtrans/` and installs the project in editable mode.
 
-```sh
-# Upgrade to latest version
-pipx upgrade llm-subtrans
+#### Option 2: Manual Setup
 
-# Reinstall with different extras
-pipx uninstall llm-subtrans
-pipx install "llm-subtrans[openai,gemini,claude]"
-
-# Uninstall
-pipx uninstall llm-subtrans
-```
-
-### Setup scripts
-
-The easiest setup method is to run the unified installation script:
-- **Windows**: Run `install.bat`
-- **MacOS/Linux**: Run `install.sh`
-
-These scripts will create a virtual environment and offer **install with GUI** or **install command line only** options, with additional options to add support for specific providers. The script will guide you through the setup and generate command scripts to launch the application.
-
-During the installing process, you can choose to input an API key for each selected provider when prompted, which will be saved in a .env file so that you don't need to provide it every time you run the program. This is largely redundant if you only plan to use the GUI, as keys can be saved in the app settings.
-
-### Manual configuration
-**If you ran an install script you can skip the remaining steps. Continue reading _only_ if you want to configure the environment manually instead.**
+If you prefer to set up manually:
 
 1. Create a new file named .env in the root directory of the project. Add any required settings for your chosen provider to the .env file like this:
     ```sh
@@ -200,43 +190,41 @@ During the installing process, you can choose to input an API key for each selec
     OPENAI_REASONING_EFFORT=low/medium/high
     ```
 
-2. Create a virtual environment for the project by running the following command in the root folder to create a local environment for the Python interpreter (optional, but highly recommended to avoid dependency conflicts with other Python applications):
+2. Create a virtual environment:
 
     ```sh
-    python -m venv envsubtrans
+    python3 -m venv envsubtrans
     ```
 
-3. Activate the virtual environment by running the appropriate command for your operating system. You will need to do this each time before running the app.
+3. Activate the virtual environment (required each time you work on the project):
 
     ```sh
-    .\envsubtrans\Scripts\activate      # Windows
-    source ./envsubtrans/bin/activate   # Mac/Linux
+    source ./envsubtrans/bin/activate
     ```
 
-4. Install the project (add the -e switch for an editable install if you want to modify the code):
+4. Install the project in editable mode:
 
     ```sh
-    pip install -e .                   # Minimal install of command line tools with support for OpenRouter or Custom Server
-    pip install -e ".[gui]"            # Core module and default provider with GUI module
-    pip install -e ".[gui,openai,gemini,claude,mistral,bedrock]"   # Full install with optional providers (delete to taste)
+    # Minimal install (OpenRouter only)
+    pip install -e .
+
+    # With commonly used providers
+    pip install -e ".[openai,gemini,claude]"
+
+    # With all providers
+    pip install -e ".[openai,gemini,claude,mistral,bedrock,azure]"
+
+    # With MKV extraction support
+    pip install -e ".[mkv,openai,gemini,claude]"
     ```
 
 ## Usage
-The program works by dividing the subtitles up into batches and sending each one to the translation service in turn. 
 
-It can potentially make many API calls for each subtitle file, depending on the batch size. Speed heavily depends on the selected model.
+The program works by dividing the subtitles up into batches and sending each one to the translation service in turn. It can potentially make many API calls for each subtitle file, depending on the batch size. Speed heavily depends on the selected model.
 
-By default The translated subtitles will be written to a new file in the same directory with the target langugage appended to the original filename.
-
-### GUI
-The [Subtrans GUI](https://github.com/machinewrapped/llm-subtrans/wiki/GUI#gui-subtrans) is the best and easiest way to use the program. 
-
-After installation, launch the GUI with the `gui-subtrans` command or shell script, and hopefully the rest should be self-explanatory.
-
-See the project wiki for further details on how to use the program.
+By default, the translated subtitles will be written to a new file in the same directory with the target language appended to the original filename.
 
 ### Command Line
-LLM-Subtrans can be used as a console command or shell script. The install scripts create a cmd or sh file in the project root for each provider, which will take care of activating the virtual environment and calling the corresponding translation script.
 
 The most basic usage is:
 ```sh
@@ -278,9 +266,7 @@ Other options that can be specified on the command line are detailed below.
 
 ## Project File
 
-**Note**: Project files are enabled by default in the GUI.
-
-The `--project` argument or `PROJECT_FILE` .env setting control whether a project file will be written to disc for the command line.
+The `--project` argument or `PROJECT_FILE` .env setting control whether a project file will be written to disc.
 
 If enabled, a file will be created with the `.subtrans` extension when a subtitle file is loaded, containing details of the project. It will be updated as the translation progresses. Writing a project file allows, amongst other things, resuming a translation that was interrupted. It is highly recommended.
 
@@ -543,7 +529,7 @@ Fork the repository onto your own GitHub account.
 Clone the repository onto your local machine using the following command:
 
 ```sh
-git clone https://github.com/your_username/llm-subtrans.git
+git clone https://github.com/tinof/llm-subtrans.git
 ```
 
 Create a new branch for your changes using the following command:
@@ -589,21 +575,11 @@ Translation providers:
 - mistralai (https://github.com/mistralai/client-python)
 - boto3 (Amazon Bedrock) (https://github.com/boto/boto3)
 
-For the GUI:
-- pyside6 (https://wiki.qt.io/Qt_for_Python)
-- blinker (https://pythonhosted.org/blinker/)
-- darkdetect (https://github.com/albertosottile/darkdetect)
-- appdirs (https://github.com/ActiveState/appdirs)
-
-For bundled versions:
-- python (https://www.python.org/)
-- pyinstaller (https://pyinstaller.org/)
-
 ## Version History
 
-Version 1.3 added OpenRouter as the default translation service, opening up access to many more
+Version 1.3 added OpenRouter as the default translation service, opening up access to many more models.
 
-Version 1.2 added localization for the GUI and support for the GPT-5 model line.
+Version 1.2 added localization support and the GPT-5 model line.
 
 Version 1.1 added support for a more flexible translation format for use with custom instructions.
 
@@ -611,18 +587,11 @@ Version 1.0 is (ironically) a minor update, updating the major version to 1.0 be
 
 Version 0.7 introduced optional post-processing of translated subtitles to try to fix some of the common issues with LLM-translated subtitles (e.g. adding line breaks), along with new default instructions that tend to produce fewer errors.
 
-Version 0.6 changes the architecture to a provider-based system, allowing multiple AI services to be used as translators.
-Settings are compartmentalised for each provider. For the intial release the only supported provider is **OpenAI**.
+Version 0.6 changes the architecture to a provider-based system, allowing multiple AI services to be used as translators. Settings are compartmentalised for each provider. For the initial release the only supported provider is **OpenAI**.
 
-Version 0.5 adds support for gpt-instruct models and a refactored code base to support different translation engines. For most users, the recommendation is still to use the **gpt-3.5-turbo-16k** model with batch sizes of between (10,100) lines, for the best combination of performance/cost and translation quality.
+Version 0.5 adds support for gpt-instruct models and a refactored code base to support different translation engines.
 
-Version 0.4 features significant optimisations to the GUI making it more responsive and usable, along with numerous bug fixes.
-
-Version 0.3 featured a major effort to bring the GUI up to full functionality and usability, including adding options dialogs and more, plus many bug fixes.
-
-Version 0.2 employs a new prompting approach that greatly reduces desyncs caused by GPT merging together source lines in the translation. This can reduce the naturalness of the translation when the source and target languages have very different grammar, but it provides a better base for a human to polish the output.
-
-The instructions have also been made more detailed, with multiple examples of correct output for GPT to reference, and the generation of summaries has been improved so that GPT is better able to understand the context of the batch it is translating. Additionally, double-clicking a scene or batch now allows the summary to be edited by hand, which can greatly improve the results of a retranslation and of subsequent batches or scenes. Individually lines can also be edited by double-clicking them.
+Version 0.2 employs a new prompting approach that greatly reduces desyncs caused by GPT merging together source lines in the translation. The instructions have also been made more detailed, with multiple examples of correct output for GPT to reference, and the generation of summaries has been improved so that GPT is better able to understand the context of the batch it is translating.
 
 ## License
 LLM-Subtrans is licensed under the MIT License. See LICENSE for the 3rd party library licenses.
