@@ -1,0 +1,4 @@
+filelock
+python-dotenv
+rich
+subtitle_filter
