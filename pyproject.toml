@@ -20,7 +20,11 @@ dependencies = [
     "requests",
     "setuptools",
     "httpx",
-    "httpx[socks]"
+    "httpx[socks]",
+    "subtitle_filter",
+    "chardet",
+    "filelock",
+    "rich"
 ]
 
 [project.optional-dependencies]
@@ -46,5 +50,8 @@ exsubs = "scripts.exsubs:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["PySubtrans*", "scripts*"]
+include = ["PySubtrans*", "scripts*", "instructions*"]
 namespaces = true
+
+[tool.setuptools.package-data]
+instructions = ["*.txt"]

@@ -1,4 +1,5 @@
 import os
+import importlib.resources as resources
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -50,16 +51,46 @@ class MKVConfig:
 
     def __post_init__(self):
         """Initialize configurable paths from environment or defaults"""
-        if self.instruction_file is None:
-            # Check environment variable first
-            env_path = os.getenv('LLMSUBTRANS_INSTRUCTION_FILE')
-            if env_path:
-                self.instruction_file = Path(env_path)
-            else:
-                # Default to user's config directory
-                config_dir = Path.home() / '.config' / 'llm-subtrans'
-                lang_code = self.get_language_code(self.target_language)
-                self.instruction_file = config_dir / f'instructions_{lang_code}.txt'
+        if self.instruction_file is not None:
+            return
+
+        # Check environment variable first
+        env_path = os.getenv('LLMSUBTRANS_INSTRUCTION_FILE')
+        if env_path:
+            self.instruction_file = Path(env_path)
+            return
+
+        # Default to user's config directory and try to seed from packaged instructions
+        config_dir = Path.home() / '.config' / 'llm-subtrans'
+        lang_code = self.get_language_code(self.target_language)
+        default_path = config_dir / f'instructions_{lang_code}.txt'
+
+        # Ensure directory exists
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except Exception:
+            # If directory cannot be created, still set the intended path
+            pass
+
+        # Attempt to seed from packaged resource if not already present
+        # Primary request: use the repository file 'instructions/instructions_fi.txt' as default
+        try:
+            pkg = 'instructions'
+            resource_name = f'instructions_{lang_code}.txt'
+            traversable = resources.files(pkg).joinpath(resource_name)
+            if not default_path.exists() and traversable.is_file():
+                with resources.as_file(traversable) as src_path:
+                    content = Path(src_path).read_text(encoding='utf-8')
+                    try:
+                        default_path.write_text(content, encoding='utf-8')
+                    except Exception:
+                        # If writing fails, ignore and fall back to non-existent path
+                        pass
+        except Exception:
+            # If packaged resource is unavailable, continue silently
+            pass
+
+        self.instruction_file = default_path
 
     @staticmethod
     def get_language_code(lang : str) -> str:

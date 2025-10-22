@@ -19,11 +19,8 @@ Note: LLM-Subtrans requires an active internet connection. Subtitles are sent to
 pip install --user pipx
 pipx ensurepath
 
-# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude)
+# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude) — MKV/exsubs tooling is included by default
 pipx install "llm-subtrans[openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
-
-# Install with MKV extraction support (requires mkvtoolnix)
-pipx install "llm-subtrans[mkv,openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
 
 # Or install with all providers
 pipx install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure] @ git+https://github.com/tinof/llm-subtrans.git"
@@ -43,9 +40,17 @@ claude-subtrans --model claude-3-5-haiku-latest -l German subtitle.srt
 # Or use the universal llm-subtrans command with OpenRouter
 llm-subtrans --auto -l Japanese subtitle.srt
 
-# Extract and translate subtitles from MKV files (requires [mkv] extras and mkvtoolnix)
+# Extract and translate subtitles from MKV files (requires mkvtoolnix binaries)
 exsubs video.mkv --gemini -l Finnish
 ```
+
+### exsubs workflow
+
+- Requires mkvtoolnix (`mkvmerge`, `mkvextract`) installed on your PATH
+- Always runs subtitle preprocessing and postprocessing for best translation quality
+- Seeds a default instruction file at `~/.config/llm-subtrans/instructions_fi.txt`; override with `LLMSUBTRANS_INSTRUCTION_FILE`
+- Produces translated `.fi.srt` files by default (use `-l` / `--language` to change target language)
+- Defaults to the Gemini provider; switch with `--gpt`, `--claude`, or `--deepseek`
 
 To upgrade or uninstall:
 
