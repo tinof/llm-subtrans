@@ -50,3 +50,30 @@ Always run the unit_tests at the end of a task to validate any changes to the co
 
 ## Information
 Consult `docs/architecture.md` for detailed information on the project architecture and components.
+
+## Upstream Sync (Fork Maintenance)
+- "upstream" is the Git remote pointing to the original repo (verify with `git remote -v`). In this fork it is set to `https://github.com/machinewrapped/llm-subtrans.git`.
+- Preferred workflow for public main: merge (not rebase) to preserve history and avoid force-pushes.
+- Keep our CLI-only customizations intact: do not reintroduce GUI or Windows-specific code.
+
+### Quick Steps
+- Fetch upstream: `git fetch upstream`
+- Review ahead/behind:
+  - Upstream ahead: `git log --oneline main..upstream/main`
+  - Fork ahead: `git log --oneline upstream/main..main`
+- Merge: `git merge upstream/main` and resolve conflicts by
+  - Preserving: top-level `pyproject.toml` (CLI description/version, scripts) and Linux/macOS-only constraints
+  - Adopting: changes under `PySubtrans/` (core engine), tests, locales
+- Activate venv and test: `source ./envsubtrans/bin/activate && python tests/unit_tests.py`
+- Push if green: `git push origin main`
+
+### Prompt Template (for Codex)
+- "Merge upstream/main into our main; preserve CLI-only fork constraints (no GUI/Windows), keep top-level pyproject CLI metadata/scripts, adopt upstream PySubtrans changes, run tests in venv, and push to origin/main if tests pass."
+
+### When to Rebase
+- Only if a linear history is required and force-push is acceptable. Otherwise, prefer merges.
+
+## Repository Hygiene
+- Never print or read `.env` contents.
+- New files or scripts must not add imports in the middle of functions.
+- Use `regex` (not `re`) for regular expressions.

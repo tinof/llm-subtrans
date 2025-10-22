@@ -50,3 +50,4 @@ untranslated_msgids_*.txt
 /subtitles
 /translated
 batch-translate.sh
+AGENTS.md
