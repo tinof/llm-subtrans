@@ -22,7 +22,7 @@ MODE_TO_CMD = {
 MODE_TO_DEFAULT_MODEL = {
     TranslationMode.CHATGPT: "gpt-4o-mini",
     TranslationMode.CLAUDE: "claude-3-5-haiku-latest",
-    TranslationMode.GEMINI: "gemini-2.0-flash",
+    TranslationMode.GEMINI: "gemini-2.5-flash-preview-09-2025",
     TranslationMode.DEEPSEEK: "deepseek-chat",
 }
 

@@ -24,12 +24,22 @@ def main() -> int:
     parser = CreateArgParser(f"Translates subtitles using a Google Gemini model")
     parser.add_argument('-k', '--apikey', type=str, default=None, help=f"Your Gemini API Key (https://makersuite.google.com/app/apikey)")
     parser.add_argument('-m', '--model', type=str, default=None, help="The model to use for translation")
+    parser.add_argument('--vertex', action='store_true', help="Use Vertex AI Gemini with Application Default Credentials")
+    parser.add_argument('--vertex-project', type=str, default=None, help="Vertex AI project ID")
+    parser.add_argument('--vertex-location', type=str, default=None, help="Vertex AI region (default us-central1)")
     args = parser.parse_args()
 
     logger_options = InitLogger("gemini-subtrans", args.debug)
 
     try:
-        options : Options = CreateOptions(args, provider, model=args.model or default_model)
+        options : Options = CreateOptions(
+            args,
+            provider,
+            model=args.model or default_model,
+            use_vertex=args.vertex,
+            vertex_project=args.vertex_project,
+            vertex_location=args.vertex_location
+        )
 
         # Create a project for the translation
         project : SubtitleProject = CreateProject(options, args)

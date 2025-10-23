@@ -51,6 +51,30 @@ exsubs video.mkv --gemini -l Finnish
 - Seeds a default instruction file at `~/.config/llm-subtrans/instructions_fi.txt`; override with `LLMSUBTRANS_INSTRUCTION_FILE`
 - Produces translated `.fi.srt` files by default (use `-l` / `--language` to change target language)
 - Defaults to the Gemini provider; switch with `--gpt`, `--claude`, or `--deepseek`
+- Uses Vertex AI Gemini by default (no API key required) and falls back to Google AI Studio keys if `GEMINI_USE_VERTEX` is set to `false`
+
+### Vertex AI setup (default for `exsubs`)
+
+1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) and sign in: `gcloud auth login`.
+2. Select or create a project that has Vertex AI enabled:
+   ```sh
+   gcloud config set project <your-project-id>
+   gcloud services enable aiplatform.googleapis.com
+   ```
+3. Create Application Default Credentials so llm-subtrans can call Vertex:
+   ```sh
+   gcloud auth application-default login --project <your-project-id>
+   ```
+   (Alternatively, point `GOOGLE_APPLICATION_CREDENTIALS` at a service-account JSON key.)
+4. Persist the defaults in your shell profile (e.g. `~/.zshrc` or `~/.bashrc`) so `exsubs` picks them up automatically:
+   ```sh
+   echo 'export GEMINI_USE_VERTEX=true' >> ~/.zshrc
+   echo 'export VERTEX_PROJECT=<your-project-id>' >> ~/.zshrc
+   echo 'export VERTEX_LOCATION=us-central1' >> ~/.zshrc
+   echo 'export GEMINI_MODEL=gemini-2.5-flash-preview-09-2025' >> ~/.zshrc
+   ```
+   Reload your shell (`exec $SHELL`) after editing the file. You can override the model, rate limit, or other Gemini settings the same way; if no environment variable is defined llm-subtrans falls back to the defaults shown here.
+5. To revert to API-key usage, set `export GEMINI_USE_VERTEX=false` (and provide `GEMINI_API_KEY`).
 
 To upgrade or uninstall:
 
@@ -172,6 +196,11 @@ If you prefer to set up manually:
     OPENROUTER_API_KEY=<your_openrouter_api_key>
     OPENAI_API_KEY=<your_openai_api_key>
     GEMINI_API_KEY=<your_gemini_api_key>
+    # Optional: use Vertex AI instead of Gemini API keys
+    GEMINI_USE_VERTEX=True
+    VERTEX_PROJECT=gen-lang-client-0252789805
+    VERTEX_LOCATION=us-central1
+    GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
     AZURE_API_KEY=<your_azure_api_key>
     CLAUDE_API_KEY=<your_claude_api_key>
     ```
@@ -404,8 +433,16 @@ Some additional arguments are available for specific providers.
 - `-k`, `--apikey`:
   Your [Google Gemini API Key](https://aistudio.google.com/app/apikey). (the app will look for GEMINI_API_KEY in the environment if this is not provided)
 
+- `--vertex`:
+  Use [Vertex AI Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs) with Application Default Credentials instead of an API key. Configure the project and region via `--vertex-project`, `--vertex-location`, or the `VERTEX_PROJECT` / `VERTEX_LOCATION` environment variables.
+
+- `--vertex-project` / `--vertex-location`:
+  Override the Google Cloud project and region (defaults to environment values; region falls back to `us-central1`).
+
 - `-m`, `--model`:
   Specify the [AI model](https://ai.google.dev/models/gemini) to use for translation
+
+> `exsubs` uses Vertex AI and the `gemini-2.5-flash-preview-09-2025` model by default. Set `GEMINI_MODEL` or `GEMINI_USE_VERTEX=false` to change this behaviour globally.
 
 #### Claude
 - `-k`, `--apikey`:

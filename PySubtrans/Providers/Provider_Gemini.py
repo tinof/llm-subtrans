@@ -44,15 +44,30 @@ else:
                     'enable_thinking': settings.get_bool('enable_thinking', os.getenv('GEMINI_ENABLE_THINKING', "False") == "True"),
                     'thinking_budget': settings.get_int('thinking_budget', env_int('GEMINI_THINKING_BUDGET', 100)) or 100,
                     'temperature': settings.get_float('temperature', env_float('GEMINI_TEMPERATURE', 0.0)),
-                    'rate_limit': settings.get_float('rate_limit', env_float('GEMINI_RATE_LIMIT', 60.0))
+                    'rate_limit': settings.get_float('rate_limit', env_float('GEMINI_RATE_LIMIT', 60.0)),
+                    'use_vertex': settings.get_bool('use_vertex', os.getenv('GEMINI_USE_VERTEX', "False") == "True"),
+                    'vertex_project': settings.get_str('vertex_project') or os.getenv('VERTEX_PROJECT') or os.getenv('GEMINI_VERTEX_PROJECT'),
+                    'vertex_location': settings.get_str('vertex_location') or os.getenv('VERTEX_LOCATION') or os.getenv('GEMINI_VERTEX_LOCATION') or 'us-central1'
                 }))
 
-                self.refresh_when_changed = ['api_key', 'model', 'enable_thinking']
+                self.refresh_when_changed = ['api_key', 'model', 'enable_thinking', 'use_vertex', 'vertex_project', 'vertex_location']
                 self.gemini_models = []
 
             @property
             def api_key(self) -> str|None:
                 return self.settings.get_str( 'api_key')
+
+            @property
+            def use_vertex(self) -> bool:
+                return self.settings.get_bool('use_vertex', False)
+
+            @property
+            def vertex_project(self) -> str|None:
+                return self.settings.get_str('vertex_project')
+
+            @property
+            def vertex_location(self) -> str|None:
+                return self.settings.get_str('vertex_location')
 
             def GetTranslationClient(self, settings : SettingsType) -> TranslationClient:
                 client_settings = SettingsType(self.settings.copy())
@@ -62,16 +77,26 @@ else:
                     'supports_streaming': True,
                     'supports_conversation': False,         # Actually it does support conversation
                     'supports_system_messages': False,       # This is what it doesn't support
-                    'supports_system_prompt': True
+                    'supports_system_prompt': True,
+                    'use_vertex': self.use_vertex,
+                    'vertex_project': self.vertex_project,
+                    'vertex_location': self.vertex_location
                     })
                 return GeminiClient(client_settings)
 
             def GetOptions(self, settings : SettingsType) -> GuiSettingsType:
                 options : GuiSettingsType = {
-                    'api_key': (str, _("A Google Gemini API key is required to use this provider (https://makersuite.google.com/app/apikey)"))
+                    'use_vertex': (bool, _("Use Vertex AI (requires Application Default Credentials and Vertex AI enabled in the selected project)"))
                 }
 
-                if self.api_key:
+                if not self.use_vertex:
+                    options['api_key'] = (str, _("A Google Gemini API key is required to use this provider (https://makersuite.google.com/app/apikey)"))
+
+                if self.use_vertex:
+                    options['vertex_project'] = (str, _("Google Cloud project ID for Vertex AI requests"))
+                    options['vertex_location'] = (str, _("Vertex AI region (e.g. us-central1)"))
+
+                if self.use_vertex or self.api_key:
                     try:
                         models = self.available_models
                         if models:
@@ -107,9 +132,18 @@ else:
                 """
                 Validate the settings for the provider
                 """
-                if not self.api_key:
+                if not self.use_vertex and not self.api_key:
                     self.validation_message = _("API Key is required")
                     return False
+
+                if self.use_vertex:
+                    if not self.vertex_project:
+                        self.validation_message = _("Vertex AI project ID is required")
+                        return False
+
+                    if not self.vertex_location:
+                        self.validation_message = _("Vertex AI location is required")
+                        return False
 
                 if not self.GetAvailableModels():
                     self.validation_message = "Unable to retrieve models. Gemini API may be unavailable in your region."
@@ -118,13 +152,34 @@ else:
                 return True
 
             def _get_gemini_models(self):
-                if not self.api_key:
-                    return []
-
                 try:
-                    gemini_client = genai.Client(api_key=self.api_key, http_options={'api_version': 'v1alpha'})
-                    config = ListModelsConfig(query_base=True)
+                    if not self.use_vertex and not self.api_key:
+                        return []
+
+                    gemini_client = self._create_client()
+                    config = ListModelsConfig(query_base=True) if not self.use_vertex else ListModelsConfig()
                     all_models = gemini_client.models.list(config=config)
+
+                    if self.use_vertex:
+                        vertex_models = []
+                        for model in all_models:
+                            model_name = getattr(model, 'name', '') or ''
+                            if 'models/gemini' not in model_name:
+                                continue
+
+                            if 'embedding' in model_name:
+                                continue
+
+                            if getattr(model, 'display_name', None) is None:
+                                try:
+                                    model.display_name = model_name.split('/')[-1]
+                                except Exception:
+                                    model.display_name = model_name
+
+                            vertex_models.append(model)
+
+                        return sorted({m.display_name: m for m in vertex_models}.values(), key=lambda m: m.display_name)
+
                     generate_models = [ m for m in all_models if m.supported_actions and 'generateContent' in m.supported_actions ]
                     text_models = [m for m in generate_models if m.display_name and "Vision" not in m.display_name and "TTS" not in m.display_name]
 
@@ -142,10 +197,25 @@ else:
                     return self.gemini_models[0].name if self.gemini_models else ""
 
                 for m in self.gemini_models:
-                    if m.name == f"models/{name}" or m.display_name == name:
+                    if m.display_name == name:
+                        return m.name
+
+                    if name and m.name.endswith(name):
+                        return m.name
+
+                    if m.name == f"models/{name}" or m.name == name:
                         return m.name
 
                 raise ValueError(f"Model {name} not found")
+
+            def _create_client(self):
+                if self.use_vertex:
+                    if not self.vertex_project:
+                        raise ValueError(_("Vertex AI project ID not configured"))
+
+                    return genai.Client(vertexai=True, project=self.vertex_project, location=self.vertex_location)
+
+                return genai.Client(api_key=self.api_key, http_options={'api_version': 'v1alpha'})
 
             def _deduplicate_models(self, models : list) -> list:
                 """Deduplicate models by display name, preferring -latest versions"""
@@ -175,4 +245,3 @@ else:
     except ImportError:
         from PySubtrans.Helpers.Localization import _
         logging.info(_("Latest Google AI SDK (google-genai) is not installed. Gemini provider will not be available. Run installer or `pip install google-genai` to fix."))
-

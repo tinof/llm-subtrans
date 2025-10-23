@@ -39,6 +39,12 @@ class GeminiClient(TranslationClient):
             model=self.model or _("default")
         ))
 
+        if self.use_vertex:
+            self._emit_info(_("Using Vertex AI project {project} in {location}").format(
+                project=self.vertex_project or _("(unspecified)"),
+                location=self.vertex_location or _("(unspecified)")
+            ))
+
         self.safety_settings: list[SafetySetting] = [
             SafetySetting(category=HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=HarmBlockThreshold.BLOCK_NONE),
             SafetySetting(category=HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=HarmBlockThreshold.BLOCK_NONE),
@@ -69,6 +75,18 @@ class GeminiClient(TranslationClient):
     @property
     def rate_limit(self) -> float|None:
         return self.settings.get_float( 'rate_limit')
+
+    @property
+    def use_vertex(self) -> bool:
+        return self.settings.get_bool('use_vertex', False)
+
+    @property
+    def vertex_project(self) -> str|None:
+        return self.settings.get_str('vertex_project')
+
+    @property
+    def vertex_location(self) -> str|None:
+        return self.settings.get_str('vertex_location')
 
     def _request_translation(self, request: TranslationRequest, temperature: float|None = None) -> Translation|None:
         """
@@ -130,7 +148,7 @@ class GeminiClient(TranslationClient):
         if not isinstance(prompt.content, str):
             raise TranslationImpossibleError(_("Content must be a string for Gemini"))
 
-        gemini_client = genai.Client(api_key=self.api_key, http_options={'api_version': 'v1alpha'})
+        gemini_client = self._create_client()
         config = GenerateContentConfig(
             candidate_count=1,
             temperature=temperature,
@@ -208,7 +226,7 @@ class GeminiClient(TranslationClient):
             prompt_feedback=first_prompt_feedback
         )
 
-        return self._process_gemini_response(response)
+        return self._process_gemini_response(response) if not self.aborted else None
 
 
     def _process_gemini_response(self, gcr: GenerateContentResponse) -> dict[str, Any]:
@@ -276,6 +294,18 @@ class GeminiClient(TranslationClient):
             response['reasoning'] = thoughts
 
         return response
+
+    def _create_client(self):
+        if self.use_vertex:
+            if not self.vertex_project or not self.vertex_location:
+                raise TranslationImpossibleError(_("Vertex AI project and location must be provided"))
+
+            return genai.Client(vertexai=True, project=self.vertex_project, location=self.vertex_location)
+
+        if not self.api_key:
+            raise TranslationImpossibleError(_("API Key is required"))
+
+        return genai.Client(api_key=self.api_key, http_options={'api_version': 'v1alpha'})
 
     def _extract_block_info(self, gcr: GenerateContentResponse) -> str:
         """

@@ -37,6 +37,22 @@ logging.basicConfig(
 logger = logging.getLogger("exsubs")
 
 
+def _using_vertex() -> bool:
+    value = os.getenv("GEMINI_USE_VERTEX")
+    if value is None:
+        return True
+
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+def _vertex_project() -> str|None:
+    return os.getenv("VERTEX_PROJECT") or os.getenv("GEMINI_VERTEX_PROJECT")
+
+
+def _vertex_location() -> str|None:
+    return os.getenv("VERTEX_LOCATION") or os.getenv("GEMINI_VERTEX_LOCATION") or "us-central1"
+
+
 def verify_dependencies():
     """Verify required command line tools are available"""
     import subprocess
@@ -50,6 +66,9 @@ def verify_dependencies():
 
 def verify_api_key(mode : TranslationMode):
     """Verify required API key is set based on translation mode"""
+    if mode == TranslationMode.GEMINI and _using_vertex():
+        return
+
     from PySubtrans.MKV.Config import MODE_TO_ENV
     required_key = MODE_TO_ENV[mode]
     if not os.getenv(required_key):
@@ -149,6 +168,8 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
 
     provider = provider_map.get(mode, "Gemini")
     model = MODE_TO_DEFAULT_MODEL[mode]
+    if mode == TranslationMode.GEMINI:
+        model = os.getenv('GEMINI_MODEL') or model
 
     # Create PySubtrans options
     settings = {
@@ -162,6 +183,17 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
         'min_batch_size': 10,
         'max_batch_size': 50,
     }
+
+    if mode == TranslationMode.GEMINI:
+        use_vertex = _using_vertex()
+        settings['use_vertex'] = use_vertex
+        if use_vertex:
+            project = _vertex_project()
+            location = _vertex_location()
+            if project:
+                settings['vertex_project'] = project
+            if location:
+                settings['vertex_location'] = location
 
     # Set instruction file if it exists
     if config.instruction_file and config.instruction_file.exists():
