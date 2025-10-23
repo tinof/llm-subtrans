@@ -1,4 +1,5 @@
 import importlib.util
+import subprocess
 import logging
 import os
 
@@ -20,6 +21,24 @@ else:
         from PySubtrans.Providers.Clients.GeminiClient import GeminiClient
         from PySubtrans.TranslationClient import TranslationClient
         from PySubtrans.TranslationProvider import TranslationProvider
+
+        def _default_vertex_project() -> str|None:
+            # Derive default project from common envs or gcloud config
+            for key in ('VERTEX_PROJECT', 'GEMINI_VERTEX_PROJECT', 'GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT'):
+                value = os.getenv(key)
+                if value:
+                    return value
+            try:
+                result = subprocess.run(
+                    ["gcloud", "config", "get-value", "project", "--quiet"],
+                    capture_output=True, text=True, timeout=2
+                )
+                project = (result.stdout or "").strip()
+                if project and project != "(unset)":
+                    return project
+            except Exception:
+                pass
+            return None
 
         class GeminiProvider(TranslationProvider):
             name = "Gemini"
@@ -46,7 +65,7 @@ else:
                     'temperature': settings.get_float('temperature', env_float('GEMINI_TEMPERATURE', 0.0)),
                     'rate_limit': settings.get_float('rate_limit', env_float('GEMINI_RATE_LIMIT', 60.0)),
                     'use_vertex': settings.get_bool('use_vertex', os.getenv('GEMINI_USE_VERTEX', "False") == "True"),
-                    'vertex_project': settings.get_str('vertex_project') or os.getenv('VERTEX_PROJECT') or os.getenv('GEMINI_VERTEX_PROJECT'),
+                    'vertex_project': settings.get_str('vertex_project') or _default_vertex_project(),
                     'vertex_location': settings.get_str('vertex_location') or os.getenv('VERTEX_LOCATION') or os.getenv('GEMINI_VERTEX_LOCATION') or 'europe-west1'
                 }))
 

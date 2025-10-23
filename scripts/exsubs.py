@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 import statistics
+import subprocess
 import sys
 import threading
 import time
@@ -147,8 +148,23 @@ def _using_vertex() -> bool:
     return value.lower() in {"1", "true", "yes", "on"}
 
 
+def _detect_gcloud_project() -> str|None:
+    for key in ("VERTEX_PROJECT", "GEMINI_VERTEX_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT"):
+        value = os.getenv(key)
+        if value:
+            return value
+    try:
+        result = subprocess.run(["gcloud", "config", "get-value", "project", "--quiet"], capture_output=True, text=True, timeout=2)
+        proj = (result.stdout or "").strip()
+        if proj and proj != "(unset)":
+            return proj
+    except Exception:
+        pass
+    return None
+
+
 def _vertex_project() -> str|None:
-    return os.getenv("VERTEX_PROJECT") or os.getenv("GEMINI_VERTEX_PROJECT")
+    return _detect_gcloud_project()
 
 
 def _vertex_location() -> str|None:
@@ -157,7 +173,6 @@ def _vertex_location() -> str|None:
 
 def verify_dependencies():
     """Verify required command line tools are available"""
-    import subprocess
     required_commands = ["mkvextract", "mkvmerge"]
     for cmd in required_commands:
         result = subprocess.run(["which", cmd], capture_output=True)
