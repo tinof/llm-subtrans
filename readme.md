@@ -81,11 +81,13 @@ exsubs video.mkv --gemini -l Finnish
    echo 'export SCENE_THRESHOLD=240 MIN_BATCH_SIZE=80 MAX_BATCH_SIZE=180 MAX_CONTEXT_SUMMARIES=6' >> ~/.zshrc
    ```
    Reload your shell (`exec $SHELL`) after editing the file. You can override the model, rate limit, or other Gemini settings the same way; if no environment variable is defined llm-subtrans falls back to the defaults shown here.
-   - If you switch to the Flash preview model, the CLI auto‑applies a 1000 RPM limit:
+   - If you switch to the Flash preview model, the CLI auto‑applies tuned defaults and a 1000 RPM limit:
      ```sh
      export GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
-     # Optional: adjust batching for Flash
-     export SCENE_THRESHOLD=300 MIN_BATCH_SIZE=100 MAX_BATCH_SIZE=220
+     # Defaults applied automatically for Flash:
+     #   scene_threshold=300, min/max batch=100/220, max_context_summaries=6
+     # You can still override via env:
+     export SCENE_THRESHOLD=300 MIN_BATCH_SIZE=100 MAX_BATCH_SIZE=220 MAX_CONTEXT_SUMMARIES=6
      ```
 5. To revert to API-key usage, set `export GEMINI_USE_VERTEX=false` (and provide `GEMINI_API_KEY`).
 

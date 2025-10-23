@@ -48,6 +48,11 @@ GEMINI_FLASH_RATE_LIMIT = 1000.0
 GEMINI_FLASH_MODEL_SUFFIX = "gemini-2.5-flash-preview-09-2025"
 GEMINI_MAX_CONTEXT_SUMMARIES = 6
 
+# Flash preview tuned defaults
+FLASH_SCENE_THRESHOLD = 300.0
+FLASH_MIN_BATCH_SIZE = 100
+FLASH_MAX_BATCH_SIZE = 220
+
 
 class TranslationMetrics:
     """Collect batched translation statistics for user feedback."""
@@ -274,9 +279,18 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
 
     if mode == TranslationMode.GEMINI:
         model = os.getenv('GEMINI_MODEL') or GEMINI_DEFAULT_MODEL
-        scene_threshold = float(os.getenv('SCENE_THRESHOLD') or GEMINI_SCENE_THRESHOLD)
-        min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or GEMINI_MIN_BATCH_SIZE)
-        max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or GEMINI_MAX_BATCH_SIZE)
+
+        # Model-specific tuned defaults (overridable by env)
+        normalised = _normalise_model_name(model)
+        if normalised == GEMINI_FLASH_MODEL_SUFFIX:
+            scene_threshold = float(os.getenv('SCENE_THRESHOLD') or FLASH_SCENE_THRESHOLD)
+            min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or FLASH_MIN_BATCH_SIZE)
+            max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or FLASH_MAX_BATCH_SIZE)
+        else:
+            scene_threshold = float(os.getenv('SCENE_THRESHOLD') or GEMINI_SCENE_THRESHOLD)
+            min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or GEMINI_MIN_BATCH_SIZE)
+            max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or GEMINI_MAX_BATCH_SIZE)
+
         max_context_summaries = int(os.getenv('MAX_CONTEXT_SUMMARIES') or GEMINI_MAX_CONTEXT_SUMMARIES)
         rate_limit = _determine_gemini_rate_limit(model)
 
