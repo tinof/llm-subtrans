@@ -35,7 +35,7 @@ After installation, all command-line tools will be available directly:
 # Use any provider-specific command directly
 gpt-subtrans --model gpt-5-mini -l Spanish subtitle.srt
 gemini-subtrans --model gemini-2.5-flash-latest -l French subtitle.srt
-claude-subtrans --model claude-3-5-haiku-latest -l German subtitle.srt
+claude-subtrans --model claude-4-5-haiku-latest -l German subtitle.srt
 
 # Or use the universal llm-subtrans command with OpenRouter
 llm-subtrans --auto -l Japanese subtitle.srt
@@ -52,6 +52,11 @@ exsubs video.mkv --gemini -l Finnish
 - Produces translated `.fi.srt` files by default (use `-l` / `--language` to change target language)
 - Defaults to the Gemini provider; switch with `--gpt`, `--claude`, or `--deepseek`
 - Uses Vertex AI Gemini by default (no API key required) and falls back to Google AI Studio keys if `GEMINI_USE_VERTEX` is set to `false`
+- Optimized defaults for Gemini 2.5 Pro (Vertex):
+  - scene threshold 240s
+  - min/max batch size 80/180 lines
+  - context summaries 6
+  - rate limit 150 RPM (auto‑raised to 1000 RPM if you set `GEMINI_MODEL=gemini-2.5-flash-preview-09-2025`)
 
 ### Vertex AI setup (default for `exsubs`)
 
@@ -66,14 +71,22 @@ exsubs video.mkv --gemini -l Finnish
    gcloud auth application-default login --project <your-project-id>
    ```
    (Alternatively, point `GOOGLE_APPLICATION_CREDENTIALS` at a service-account JSON key.)
-4. Persist the defaults in your shell profile (e.g. `~/.zshrc` or `~/.bashrc`) so `exsubs` picks them up automatically:
+4. Persist the defaults in your shell profile (e.g. `~/.zshrc` or `~/.bashrc`) so `exsubs` picks them up automatically. These match the tuned defaults and can be adjusted per machine:
    ```sh
    echo 'export GEMINI_USE_VERTEX=true' >> ~/.zshrc
    echo 'export VERTEX_PROJECT=<your-project-id>' >> ~/.zshrc
    echo 'export VERTEX_LOCATION=us-central1' >> ~/.zshrc
-   echo 'export GEMINI_MODEL=gemini-2.5-flash-preview-09-2025' >> ~/.zshrc
+   echo 'export GEMINI_MODEL=gemini-2.5-pro' >> ~/.zshrc
+   echo 'export GEMINI_RATE_LIMIT=150' >> ~/.zshrc
+   echo 'export SCENE_THRESHOLD=240 MIN_BATCH_SIZE=80 MAX_BATCH_SIZE=180 MAX_CONTEXT_SUMMARIES=6' >> ~/.zshrc
    ```
    Reload your shell (`exec $SHELL`) after editing the file. You can override the model, rate limit, or other Gemini settings the same way; if no environment variable is defined llm-subtrans falls back to the defaults shown here.
+   - If you switch to the Flash preview model, the CLI auto‑applies a 1000 RPM limit:
+     ```sh
+     export GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
+     # Optional: adjust batching for Flash
+     export SCENE_THRESHOLD=300 MIN_BATCH_SIZE=100 MAX_BATCH_SIZE=220
+     ```
 5. To revert to API-key usage, set `export GEMINI_USE_VERTEX=false` (and provide `GEMINI_API_KEY`).
 
 To upgrade or uninstall:

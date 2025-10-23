@@ -1,8 +1,11 @@
 import argparse
 import logging
 import os
-import sys
 from pathlib import Path
+import statistics
+import sys
+import threading
+import time
 
 from dotenv import load_dotenv
 from filelock import FileLock
@@ -35,6 +38,100 @@ logging.basicConfig(
     handlers=[RichHandler(console=console, rich_tracebacks=True)],
 )
 logger = logging.getLogger("exsubs")
+
+GEMINI_DEFAULT_MODEL = "gemini-2.5-pro"
+GEMINI_SCENE_THRESHOLD = 240.0
+GEMINI_MIN_BATCH_SIZE = 80
+GEMINI_MAX_BATCH_SIZE = 180
+GEMINI_STANDARD_RATE_LIMIT = 150.0
+GEMINI_FLASH_RATE_LIMIT = 1000.0
+GEMINI_FLASH_MODEL_SUFFIX = "gemini-2.5-flash-preview-09-2025"
+GEMINI_MAX_CONTEXT_SUMMARIES = 6
+
+
+class TranslationMetrics:
+    """Collect batched translation statistics for user feedback."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._attached = False
+        self._batch_count = 0
+        self._total_lines = 0
+        self._line_counts: list[int] = []
+        self._prompt_tokens: list[int] = []
+        self._output_tokens: list[int] = []
+        self._total_tokens: list[int] = []
+
+    def attach(self, translator):
+        if self._attached:
+            return
+        translator.events.batch_translated.connect(self._on_batch_translated)
+        self._attached = True
+
+    def detach(self, translator):
+        if not self._attached:
+            return
+        translator.events.batch_translated.disconnect(self._on_batch_translated)
+        self._attached = False
+
+    def has_data(self) -> bool:
+        return self._batch_count > 0
+
+    def render(self, elapsed_seconds: float, expected_lines: int, expected_batches: int, rate_limit: float|None):
+        if not self.has_data():
+            return
+
+        avg_lines = statistics.fmean(self._line_counts) if self._line_counts else 0.0
+        max_lines = max(self._line_counts) if self._line_counts else 0
+        avg_prompt = statistics.fmean(self._prompt_tokens) if self._prompt_tokens else 0.0
+        avg_output = statistics.fmean(self._output_tokens) if self._output_tokens else 0.0
+        avg_total = statistics.fmean(self._total_tokens) if self._total_tokens else 0.0
+        max_total = max(self._total_tokens) if self._total_tokens else 0
+
+        lines_per_minute = 0.0
+        if elapsed_seconds > 0:
+            lines_per_minute = (self._total_lines / elapsed_seconds) * 60.0
+
+        console.print("\n[bold]Gemini Translation Metrics[/bold]")
+        console.print(f"Batches translated: {self._batch_count}/{expected_batches or self._batch_count}")
+        console.print(f"Lines processed: {self._total_lines}/{expected_lines or self._total_lines}")
+        console.print(f"Lines per batch (avg/max): {avg_lines:.1f}/{max_lines}")
+        if self._total_tokens:
+            console.print(f"Token usage avg (prompt/output/total): {avg_prompt:.0f}/{avg_output:.0f}/{avg_total:.0f}")
+            console.print(f"Peak total tokens: {max_total}")
+        console.print(f"Throughput: {lines_per_minute:.1f} lines/min ({elapsed_seconds:.1f}s elapsed)")
+        if rate_limit:
+            console.print(f"Applied rate limit: {rate_limit:.0f} RPM")
+
+    def _on_batch_translated(self, _sender, batch) -> None:
+        with self._lock:
+            line_count = batch.size or 0
+            self._batch_count += 1
+            self._total_lines += line_count
+            self._line_counts.append(line_count)
+
+            translation = getattr(batch, "translation", None)
+            if translation and isinstance(translation.content, dict):
+                self._append_token(self._prompt_tokens, translation.content.get('prompt_tokens'))
+                self._append_token(self._output_tokens, translation.content.get('output_tokens'))
+                self._append_token(self._total_tokens, translation.content.get('total_tokens'))
+
+    def _append_token(self, bucket: list[int], value):
+        if isinstance(value, (int, float)):
+            bucket.append(int(value))
+
+
+def _normalise_model_name(model: str|None) -> str|None:
+    if not model:
+        return None
+    return model.lower().split('/')[-1]
+
+
+def _determine_gemini_rate_limit(model: str|None) -> float:
+    normalised = _normalise_model_name(model)
+    if normalised == GEMINI_FLASH_MODEL_SUFFIX:
+        return GEMINI_FLASH_RATE_LIMIT
+    return GEMINI_STANDARD_RATE_LIMIT
 
 
 def _using_vertex() -> bool:
@@ -168,8 +265,40 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
 
     provider = provider_map.get(mode, "Gemini")
     model = MODE_TO_DEFAULT_MODEL[mode]
+    # Defaults; overridable by environment or model-specific logic below
+    scene_threshold = float(os.getenv('SCENE_THRESHOLD') or 60.0)
+    min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or 10)
+    max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or 50)
+    max_context_summaries = int(os.getenv('MAX_CONTEXT_SUMMARIES') or 10)
+    rate_limit : float|None = None
+
     if mode == TranslationMode.GEMINI:
-        model = os.getenv('GEMINI_MODEL') or model
+        model = os.getenv('GEMINI_MODEL') or GEMINI_DEFAULT_MODEL
+        scene_threshold = float(os.getenv('SCENE_THRESHOLD') or GEMINI_SCENE_THRESHOLD)
+        min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or GEMINI_MIN_BATCH_SIZE)
+        max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or GEMINI_MAX_BATCH_SIZE)
+        max_context_summaries = int(os.getenv('MAX_CONTEXT_SUMMARIES') or GEMINI_MAX_CONTEXT_SUMMARIES)
+        rate_limit = _determine_gemini_rate_limit(model)
+
+        os.environ.setdefault('GEMINI_RATE_LIMIT', str(int(rate_limit)))
+
+        use_vertex = _using_vertex()
+        settings_vertex : dict[str,str|bool] = {'use_vertex': use_vertex}
+        if use_vertex:
+            project = _vertex_project()
+            location = _vertex_location()
+            if project:
+                settings_vertex['vertex_project'] = project
+            if location:
+                settings_vertex['vertex_location'] = location
+    else:
+        rate_value = MODE_TO_RATE_LIMIT.get(mode)
+        if rate_value:
+            try:
+                rate_limit = float(rate_value)
+            except ValueError:
+                rate_limit = None
+        settings_vertex = {}
 
     # Create PySubtrans options
     settings = {
@@ -179,21 +308,17 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
         'preprocess_subtitles': True,
         'postprocess_subtitles': True,
         'model': model,
-        'scene_threshold': 60.0,
-        'min_batch_size': 10,
-        'max_batch_size': 50,
+        'scene_threshold': scene_threshold,
+        'min_batch_size': min_batch_size,
+        'max_batch_size': max_batch_size,
+        'max_context_summaries': max_context_summaries,
     }
 
-    if mode == TranslationMode.GEMINI:
-        use_vertex = _using_vertex()
-        settings['use_vertex'] = use_vertex
-        if use_vertex:
-            project = _vertex_project()
-            location = _vertex_location()
-            if project:
-                settings['vertex_project'] = project
-            if location:
-                settings['vertex_location'] = location
+    if rate_limit:
+        settings['rate_limit'] = rate_limit
+
+    if settings_vertex:
+        settings.update(settings_vertex)
 
     # Set instruction file if it exists
     if config.instruction_file and config.instruction_file.exists():
@@ -210,14 +335,27 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
     from PySubtrans import batch_subtitles
     batch_subtitles(
         project.subtitles,
-        scene_threshold=60.0,
-        min_batch_size=10,
-        max_batch_size=50
+        scene_threshold=scene_threshold,
+        min_batch_size=min_batch_size,
+        max_batch_size=max_batch_size
     )
+
+    total_batches = sum(len(scene.batches) for scene in project.subtitles.scenes) if project.subtitles and project.subtitles.scenes else 0
+    total_lines = project.subtitles.linecount if project.subtitles else 0
 
     # Translate
     translator = init_translator(options)
-    project.TranslateSubtitles(translator)
+    metrics = TranslationMetrics() if mode == TranslationMode.GEMINI else None
+    start_time = time.perf_counter()
+    try:
+        if metrics:
+            metrics.attach(translator)
+        project.TranslateSubtitles(translator)
+    finally:
+        if metrics:
+            metrics.detach(translator)
+            elapsed = time.perf_counter() - start_time
+            metrics.render(elapsed, total_lines, total_batches, rate_limit)
 
 
 def process_directory(config : MKVConfig, mode : TranslationMode, interactive : bool, show_progress : bool):
