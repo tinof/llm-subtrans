@@ -26,7 +26,7 @@ def main() -> int:
     parser.add_argument('-m', '--model', type=str, default=None, help="The model to use for translation")
     parser.add_argument('--vertex', action='store_true', help="Use Vertex AI Gemini with Application Default Credentials")
     parser.add_argument('--vertex-project', type=str, default=None, help="Vertex AI project ID")
-    parser.add_argument('--vertex-location', type=str, default=None, help="Vertex AI region (default us-central1)")
+    parser.add_argument('--vertex-location', type=str, default=None, help="Vertex AI region (default europe-west1)")
     args = parser.parse_args()
 
     logger_options = InitLogger("gemini-subtrans", args.debug)

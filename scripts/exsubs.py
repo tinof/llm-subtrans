@@ -152,7 +152,7 @@ def _vertex_project() -> str|None:
 
 
 def _vertex_location() -> str|None:
-    return os.getenv("VERTEX_LOCATION") or os.getenv("GEMINI_VERTEX_LOCATION") or "us-central1"
+    return os.getenv("VERTEX_LOCATION") or os.getenv("GEMINI_VERTEX_LOCATION") or "europe-west1"
 
 
 def verify_dependencies():

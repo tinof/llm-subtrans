@@ -47,7 +47,7 @@ else:
                     'rate_limit': settings.get_float('rate_limit', env_float('GEMINI_RATE_LIMIT', 60.0)),
                     'use_vertex': settings.get_bool('use_vertex', os.getenv('GEMINI_USE_VERTEX', "False") == "True"),
                     'vertex_project': settings.get_str('vertex_project') or os.getenv('VERTEX_PROJECT') or os.getenv('GEMINI_VERTEX_PROJECT'),
-                    'vertex_location': settings.get_str('vertex_location') or os.getenv('VERTEX_LOCATION') or os.getenv('GEMINI_VERTEX_LOCATION') or 'us-central1'
+                    'vertex_location': settings.get_str('vertex_location') or os.getenv('VERTEX_LOCATION') or os.getenv('GEMINI_VERTEX_LOCATION') or 'europe-west1'
                 }))
 
                 self.refresh_when_changed = ['api_key', 'model', 'enable_thinking', 'use_vertex', 'vertex_project', 'vertex_location']
@@ -145,9 +145,11 @@ else:
                         self.validation_message = _("Vertex AI location is required")
                         return False
 
+                # Some regions do not list Gemini models even when generation works.
+                # Treat model listing failures as non-fatal for CLI use.
                 if not self.GetAvailableModels():
-                    self.validation_message = "Unable to retrieve models. Gemini API may be unavailable in your region."
-                    return False
+                    logging.warning(_("Unable to retrieve Gemini model list; proceeding with configured model"))
+                    return True
 
                 return True
 
@@ -206,7 +208,8 @@ else:
                     if m.name == f"models/{name}" or m.name == name:
                         return m.name
 
-                raise ValueError(f"Model {name} not found")
+                # Fallback: trust the provided name if the model list is unavailable
+                return name or ""
 
             def _create_client(self):
                 if self.use_vertex:

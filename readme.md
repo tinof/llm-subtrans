@@ -75,7 +75,7 @@ exsubs video.mkv --gemini -l Finnish
    ```sh
    echo 'export GEMINI_USE_VERTEX=true' >> ~/.zshrc
    echo 'export VERTEX_PROJECT=<your-project-id>' >> ~/.zshrc
-   echo 'export VERTEX_LOCATION=us-central1' >> ~/.zshrc
+   echo 'export VERTEX_LOCATION=europe-west1' >> ~/.zshrc
    echo 'export GEMINI_MODEL=gemini-2.5-pro' >> ~/.zshrc
    echo 'export GEMINI_RATE_LIMIT=150' >> ~/.zshrc
    echo 'export SCENE_THRESHOLD=240 MIN_BATCH_SIZE=80 MAX_BATCH_SIZE=180 MAX_CONTEXT_SUMMARIES=6' >> ~/.zshrc
@@ -452,7 +452,7 @@ Some additional arguments are available for specific providers.
   Use [Vertex AI Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs) with Application Default Credentials instead of an API key. Configure the project and region via `--vertex-project`, `--vertex-location`, or the `VERTEX_PROJECT` / `VERTEX_LOCATION` environment variables.
 
 - `--vertex-project` / `--vertex-location`:
-  Override the Google Cloud project and region (defaults to environment values; region falls back to `us-central1`).
+  Override the Google Cloud project and region (defaults to environment values; region falls back to `europe-west1`).
 
 - `-m`, `--model`:
   Specify the [AI model](https://ai.google.dev/models/gemini) to use for translation
