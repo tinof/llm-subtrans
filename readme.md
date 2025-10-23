@@ -89,7 +89,13 @@ exsubs video.mkv --gemini -l Finnish
      # You can still override via env:
      export SCENE_THRESHOLD=300 MIN_BATCH_SIZE=100 MAX_BATCH_SIZE=220 MAX_CONTEXT_SUMMARIES=6
      ```
-5. To revert to API-key usage, set `export GEMINI_USE_VERTEX=false` (and provide `GEMINI_API_KEY`).
+5. Guided setup: you can run a built‑in assistant that checks gcloud, ADC and writes persistent defaults to your shell profile:
+   ```sh
+   exsubs --setup-vertex         # add -y to skip prompts
+   ```
+   This will propose exports for `GEMINI_USE_VERTEX=true`, `VERTEX_LOCATION`, `GEMINI_MODEL`, and your detected `VERTEX_PROJECT`.
+
+6. To revert to API-key usage, set `export GEMINI_USE_VERTEX=false` (and provide `GEMINI_API_KEY`).
 
 To upgrade or uninstall:
 

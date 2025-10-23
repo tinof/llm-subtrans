@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 import statistics
+import shutil
 import subprocess
 import sys
 import threading
@@ -179,6 +180,107 @@ def verify_dependencies():
         if result.returncode != 0:
             logger.error(f"{cmd} not found. Please install mkvtoolnix package.")
             sys.exit(1)
+
+
+def _detect_shell_profile() -> Path:
+    shell = os.getenv("SHELL", "").strip()
+    home = Path.home()
+    if shell.endswith("zsh"):
+        return home / ".zshrc"
+    if shell.endswith("bash"):
+        return home / ".bashrc"
+    # Fallbacks commonly loaded on login
+    for candidate in [home / ".bashrc", home / ".profile", home / ".zshrc"]:
+        return candidate
+    return home / ".profile"
+
+
+def _find_gcloud() -> str|None:
+    path = shutil.which("gcloud")
+    if path:
+        return path
+    # Try common locations
+    candidates = [
+        "/usr/bin/gcloud",
+        "/snap/bin/gcloud",
+        "/usr/local/bin/gcloud",
+        "/opt/google-cloud-sdk/bin/gcloud",
+    ]
+    for c in candidates:
+        if Path(c).exists():
+            return c
+    return None
+
+
+def setup_vertex(yes : bool = False) -> int:
+    """Interactive (or --yes) setup assistant for Vertex Gemini.
+
+    - Verifies gcloud availability and ADC.
+    - Detects default GCP project and proposes persistent exports.
+    - Writes exports to the user's shell profile on confirmation.
+    """
+    console.print("\n[bold]Vertex setup assistant[/bold]")
+
+    # 1) gcloud
+    gcloud_path = _find_gcloud()
+    if not gcloud_path:
+        console.print("[red]gcloud not found on PATH[/red]. Install Google Cloud CLI and re-run: https://cloud.google.com/sdk/docs/install")
+        return 1
+    console.print(f"gcloud: [cyan]{gcloud_path}[/cyan]")
+
+    # 2) ADC check (no token printed)
+    adc_ok = False
+    try:
+        result = subprocess.run([gcloud_path, "auth", "application-default", "print-access-token"], capture_output=True, text=True, timeout=5)
+        adc_ok = result.returncode == 0 and bool((result.stdout or "").strip())
+    except Exception:
+        adc_ok = False
+    if not adc_ok:
+        console.print("[yellow]No Application Default Credentials detected[/yellow]. Run: [bold]gcloud auth application-default login[/bold] and try again.")
+        # continue; we can still set exports
+
+    # 3) Detect project
+    project = _detect_gcloud_project()
+    if not project:
+        console.print("[yellow]No default GCP project detected[/yellow]. You can set one with: [bold]gcloud config set project <PROJECT_ID>[/bold]")
+        project = console.input("Enter project id to use (or leave blank to skip): ").strip() if not yes else ""
+
+    # 4) Decide region/model
+    region = os.getenv("VERTEX_LOCATION") or "europe-west1"
+    model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
+
+    exports : list[str] = [
+        "export GEMINI_USE_VERTEX=true",
+        f"export VERTEX_LOCATION={region}",
+        f"export GEMINI_MODEL={model}",
+    ]
+    if project:
+        exports.append(f"export VERTEX_PROJECT={project}")
+
+    console.print("\nProposed environment configuration:\n" + "\n".join(exports))
+
+    do_write = yes
+    if not do_write:
+        choice = console.input("Write these to your shell profile to persist? [y/N]: ").strip().lower()
+        do_write = choice in {"y", "yes"}
+
+    if do_write:
+        profile = _detect_shell_profile()
+        try:
+            profile.parent.mkdir(parents=True, exist_ok=True)
+            with open(profile, "a", encoding="utf-8") as f:
+                f.write("\n# llm-subtrans Vertex defaults\n")
+                f.write("\n".join(exports) + "\n")
+            console.print(f"[green]✓ Wrote exports to[/green] {profile}")
+            console.print("Run 'exec $SHELL' or start a new shell to load them.")
+        except Exception as e:
+            console.print(f"[red]Failed to write profile:[/red] {e}")
+            return 1
+
+    # 5) Summary and next command
+    console.print("\nYou can now run exsubs against an MKV file, e.g.:")
+    console.print("  exsubs --gemini --no-progress your_video.mkv")
+    return 0
 
 
 def verify_api_key(mode : TranslationMode):
@@ -499,6 +601,16 @@ def main():
         action="store_true",
         help="Run system diagnostics to identify performance bottlenecks"
     )
+    parser.add_argument(
+        "--setup-vertex",
+        action="store_true",
+        help="Verify Google Cloud CLI + ADC and write persistent Vertex defaults to your shell profile"
+    )
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="Answer yes to prompts during --setup-vertex"
+    )
     args = parser.parse_args()
 
     # Load environment variables
@@ -508,6 +620,10 @@ def main():
     if args.diagnose:
         run_diagnostics(console)
         return 0
+
+    # Vertex setup assistant
+    if args.setup_vertex:
+        return setup_vertex(yes=args.yes)
 
     # Initialize config
     config = MKVConfig()
