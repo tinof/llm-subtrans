@@ -110,6 +110,68 @@ class TranslationMetrics:
         if rate_limit:
             console.print(f"Applied rate limit: {rate_limit:.0f} RPM")
 
+
+class TranslationProgress:
+    """Lightweight progress line updated on translation events."""
+    def __init__(self, stream=None):
+        self.stream = stream or sys.stdout
+        self._file : Path|None = None
+        self._total_scenes = 0
+        self._done_scenes = 0
+        self._total_batches = 0
+        self._done_batches = 0
+        self._total_lines = 0
+        self._done_lines = 0
+        self._last_len = 0
+
+    def attach(self, translator, file_path : Path, total_lines : int):
+        self._file = file_path
+        self._total_lines = total_lines
+        translator.events.preprocessed.connect(self._on_pre)
+        translator.events.batch_translated.connect(self._on_batch)
+        translator.events.scene_translated.connect(self._on_scene)
+
+    def detach(self, translator, final : bool = False):
+        try:
+            translator.events.preprocessed.disconnect(self._on_pre)
+            translator.events.batch_translated.disconnect(self._on_batch)
+            translator.events.scene_translated.disconnect(self._on_scene)
+        except Exception:
+            pass
+        self._render(final=True)
+
+    def _on_pre(self, _s, scenes):
+        self._total_scenes = len(scenes)
+        self._total_batches = sum(len(sc.batches) for sc in scenes)
+        self._render()
+
+    def _on_batch(self, _s, batch):
+        self._done_batches += 1
+        self._done_lines += batch.size or 0
+        self._render()
+
+    def _on_scene(self, _s, _scene):
+        self._done_scenes += 1
+        self._render()
+
+    def _render(self, final : bool = False):
+        if not self._file:
+            return
+        parts = [
+            f"Translating {self._file.name}",
+            f"scenes {self._done_scenes}/{self._total_scenes}",
+            f"batches {self._done_batches}/{self._total_batches}",
+        ]
+        if self._total_lines:
+            parts.append(f"lines {self._done_lines}/{self._total_lines}")
+        msg = " | ".join(parts)
+        pad = ""
+        if len(msg) < self._last_len:
+            pad = " " * (self._last_len - len(msg))
+        self.stream.write(msg + pad + ("\n" if final else "\r"))
+        self.stream.flush()
+        self._last_len = len(msg)
+
     def _on_batch_translated(self, _sender, batch) -> None:
         with self._lock:
             line_count = batch.size or 0
@@ -295,7 +357,7 @@ def verify_api_key(mode : TranslationMode):
         sys.exit(1)
 
 
-def process_video_file(video_file : Path, config : MKVConfig, mode : TranslationMode, interactive : bool, show_progress : bool):
+def process_video_file(video_file : Path, config : MKVConfig, mode : TranslationMode, interactive : bool, show_progress : bool, show_metrics : bool = True):
     """Process a single video file - extract and translate subtitles"""
     logger.info(f"Processing {video_file}")
 
@@ -325,7 +387,7 @@ def process_video_file(video_file : Path, config : MKVConfig, mode : Translation
 
     # Translate subtitles using PySubtrans API
     try:
-        translate_subtitles(subtitle_file, translated_file, config, mode)
+        translate_subtitles(subtitle_file, translated_file, config, mode, show_progress=show_progress, show_metrics=show_metrics)
 
         # Clean up the original extracted subtitle if translation succeeded
         if translated_file.exists() and subtitle_file.exists():
@@ -373,7 +435,7 @@ def extract_subtitles(video_file : Path, subtitle_file : Path, interactive : boo
     )
 
 
-def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mode : TranslationMode):
+def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mode : TranslationMode, show_progress : bool = True, show_metrics : bool = True):
     """Translate subtitles using PySubtrans API"""
     from PySubtrans.MKV.Config import MODE_TO_DEFAULT_MODEL, MODE_TO_RATE_LIMIT
 
@@ -476,13 +538,18 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
 
     # Translate
     translator = init_translator(options)
-    metrics = TranslationMetrics() if mode == TranslationMode.GEMINI else None
+    metrics = TranslationMetrics() if (show_metrics and mode == TranslationMode.GEMINI) else None
+    progress = TranslationProgress() if show_progress else None
     start_time = time.perf_counter()
     try:
         if metrics:
             metrics.attach(translator)
+        if progress:
+            progress.attach(translator, sub_file, total_lines)
         project.TranslateSubtitles(translator)
     finally:
+        if progress:
+            progress.detach(translator, final=True)
         if metrics:
             metrics.detach(translator)
             elapsed = time.perf_counter() - start_time
@@ -592,6 +659,9 @@ def main():
         "--no-progress", action="store_true", help="Disable progress bars"
     )
     parser.add_argument(
+        "--no-metrics", action="store_true", help="Do not print end-of-run translation metrics"
+    )
+    parser.add_argument(
         "-i", "--interactive",
         action="store_true",
         help="Interactive mode - manually select subtitle track to extract"
@@ -651,10 +721,11 @@ def main():
             try:
                 # Create processor with progress control
                 show_progress = not args.no_progress
+                show_metrics = not args.no_metrics
 
                 if args.file:
                     # Process single file
-                    process_video_file(Path(args.file), config, mode, args.interactive, show_progress)
+                    process_video_file(Path(args.file), config, mode, args.interactive, show_progress, show_metrics)
                 else:
                     # Process all MKV files in current directory
                     process_directory(config, mode, args.interactive, show_progress)

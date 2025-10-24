@@ -96,6 +96,67 @@ class TranslationMetrics:
         if rate_limit:
             console.print(f"Applied rate limit: {rate_limit:.0f} RPM")
 
+
+class TranslationProgress:
+    def __init__(self, stream=None):
+        self.stream = stream or sys.stdout
+        self._file : Path|None = None
+        self._total_scenes = 0
+        self._done_scenes = 0
+        self._total_batches = 0
+        self._done_batches = 0
+        self._total_lines = 0
+        self._done_lines = 0
+        self._last_len = 0
+
+    def attach(self, translator, file_path : Path, total_lines : int):
+        self._file = file_path
+        self._total_lines = total_lines
+        translator.events.preprocessed.connect(self._on_pre)
+        translator.events.batch_translated.connect(self._on_batch)
+        translator.events.scene_translated.connect(self._on_scene)
+
+    def detach(self, translator, final : bool = False):
+        try:
+            translator.events.preprocessed.disconnect(self._on_pre)
+            translator.events.batch_translated.disconnect(self._on_batch)
+            translator.events.scene_translated.disconnect(self._on_scene)
+        except Exception:
+            pass
+        self._render(final=True)
+
+    def _on_pre(self, _s, scenes):
+        self._total_scenes = len(scenes)
+        self._total_batches = sum(len(sc.batches) for sc in scenes)
+        self._render()
+
+    def _on_batch(self, _s, batch):
+        self._done_batches += 1
+        self._done_lines += batch.size or 0
+        self._render()
+
+    def _on_scene(self, _s, _scene):
+        self._done_scenes += 1
+        self._render()
+
+    def _render(self, final : bool = False):
+        if not self._file:
+            return
+        parts = [
+            f"Translating {self._file.name}",
+            f"scenes {self._done_scenes}/{self._total_scenes}",
+            f"batches {self._done_batches}/{self._total_batches}",
+        ]
+        if self._total_lines:
+            parts.append(f"lines {self._done_lines}/{self._total_lines}")
+        msg = " | ".join(parts)
+        pad = ""
+        if len(msg) < self._last_len:
+            pad = " " * (self._last_len - len(msg))
+        self.stream.write(msg + pad + ("\n" if final else "\r"))
+        self.stream.flush()
+        self._last_len = len(msg)
+
     def _on_batch_translated(self, _sender, batch) -> None:
         with self._lock:
             self._batch_count += 1
@@ -152,7 +213,7 @@ def _vertex_location() -> str|None:
     return os.getenv("VERTEX_LOCATION") or os.getenv("GEMINI_VERTEX_LOCATION") or "europe-west1"
 
 
-def translate_srt_file(sub_file : Path, target_language : str|None, provider_flag : str|None) -> None:
+def translate_srt_file(sub_file : Path, target_language : str|None, provider_flag : str|None, show_progress : bool = True, show_metrics : bool = True) -> None:
     from PySubtrans.MKV.Config import MODE_TO_DEFAULT_MODEL, MODE_TO_RATE_LIMIT, TranslationMode, MKVConfig
 
     # Preprocess the input file in place
@@ -262,13 +323,18 @@ def translate_srt_file(sub_file : Path, target_language : str|None, provider_fla
     total_lines = project.subtitles.linecount if project.subtitles else 0
 
     translator = init_translator(options)
-    metrics = TranslationMetrics() if mode == TranslationMode.GEMINI else None
+    metrics = TranslationMetrics() if (show_metrics and mode == TranslationMode.GEMINI) else None
+    progress = TranslationProgress() if show_progress else None
     start = time.perf_counter()
     try:
         if metrics:
             metrics.attach(translator)
+        if progress:
+            progress.attach(translator, sub_file, total_lines)
         project.TranslateSubtitles(translator)
     finally:
+        if progress:
+            progress.detach(translator, final=True)
         if metrics:
             metrics.detach(translator)
             metrics.render(time.perf_counter() - start, total_lines, total_batches, rate_limit)
@@ -286,6 +352,8 @@ def main() -> int:
     parser.add_argument("-l", "--language", help="Target language (default from config)")
     parser.add_argument("--setup-vertex", action="store_true", help="Run Vertex setup assistant (delegates to exsubs --setup-vertex)")
     parser.add_argument("-y", "--yes", action="store_true", help="Answer yes to prompts for setup assistant")
+    parser.add_argument("--no-progress", action="store_true", help="Disable translation progress line")
+    parser.add_argument("--no-metrics", action="store_true", help="Do not print end-of-run translation metrics")
 
     args = parser.parse_args()
 
@@ -314,7 +382,7 @@ def main() -> int:
         provider_flag = "deepseek"
 
     try:
-        translate_srt_file(sub_path, args.language, provider_flag)
+        translate_srt_file(sub_path, args.language, provider_flag, show_progress=not args.no_progress, show_metrics=not args.no_metrics)
         return 0
     except Exception as e:
         logger.error(f"Translation failed: {e}")
@@ -323,4 +391,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
