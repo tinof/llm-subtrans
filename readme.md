@@ -40,6 +40,9 @@ claude-subtrans --model claude-4-5-haiku-latest -l German subtitle.srt
 # Or use the universal llm-subtrans command with OpenRouter
 llm-subtrans --auto -l Japanese subtitle.srt
 
+# Translate an existing .srt/.ass/.vtt file with tuned workflow (no MKV required)
+transubs subtitles.srt --gemini -l Finnish
+
 # Extract and translate subtitles from MKV files (requires mkvtoolnix binaries)
 exsubs video.mkv --gemini -l Finnish
 ```
@@ -58,7 +61,7 @@ exsubs video.mkv --gemini -l Finnish
   - context summaries 6
   - rate limit 150 RPM (auto‑raised to 1000 RPM if you set `GEMINI_MODEL=gemini-2.5-flash-preview-09-2025`)
 
-### Vertex AI setup (default for `exsubs`)
+### Vertex AI setup (default for `exsubs` and available to `transubs`)
 
 1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) and sign in: `gcloud auth login`.
 2. Select or create a project that has Vertex AI enabled:
@@ -92,6 +95,8 @@ exsubs video.mkv --gemini -l Finnish
 5. Guided setup: you can run a built‑in assistant that checks gcloud, ADC and writes persistent defaults to your shell profile:
    ```sh
    exsubs --setup-vertex         # add -y to skip prompts
+   # or, from the .srt workflow:
+   transubs --setup-vertex       # identical assistant
    ```
    This will propose exports for `GEMINI_USE_VERTEX=true`, `VERTEX_LOCATION`, `GEMINI_MODEL`, and your detected `VERTEX_PROJECT`.
 
@@ -220,7 +225,7 @@ If you prefer to set up manually:
     # Optional: use Vertex AI instead of Gemini API keys
     GEMINI_USE_VERTEX=True
     VERTEX_PROJECT=gen-lang-client-0252789805
-    VERTEX_LOCATION=us-central1
+    VERTEX_LOCATION=europe-west1
     GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
     AZURE_API_KEY=<your_azure_api_key>
     CLAUDE_API_KEY=<your_claude_api_key>
