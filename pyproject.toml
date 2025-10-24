@@ -47,6 +47,7 @@ bedrock-subtrans = "scripts.bedrock_subtrans:main"
 azure-subtrans = "scripts.azure_subtrans:main"
 batch-translate = "scripts.batch_translate:main"
 exsubs = "scripts.exsubs:main"
+transubs = "scripts.transubs:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
