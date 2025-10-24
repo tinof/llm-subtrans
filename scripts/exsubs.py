@@ -56,6 +56,74 @@ FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
 
+def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path:
+    """Generate output path replacing existing language suffix with target code."""
+    suffixes = subtitle_file.suffixes
+    extension = subtitle_file.suffix or ".srt"
+    filename = subtitle_file.name
+
+    lang_code = lang_code.lower()
+
+    if len(suffixes) >= 2:
+        language_suffix = suffixes[-2]
+        base_name = filename[: -len(language_suffix) - len(extension)]
+    else:
+        base_name = filename[: -len(extension)] if extension else filename
+
+    return subtitle_file.parent / f"{base_name}.{lang_code}{extension}"
+
+
+def _normalise_translated_output(subtitle_file : Path, desired_file : Path, target_language : str|None, lang_code : str) -> Path:
+    """Ensure translated subtitles end up at the desired path."""
+    if desired_file.exists():
+        return desired_file
+
+    suffix = subtitle_file.suffix or ".srt"
+    stem_with_lang = subtitle_file.stem
+    candidates : list[Path] = [
+        subtitle_file.with_name(f"{stem_with_lang}.translated{suffix}"),
+        subtitle_file.with_name(f"{stem_with_lang}.{lang_code}{suffix}")
+    ]
+
+    if target_language:
+        candidates.append(subtitle_file.with_name(f"{stem_with_lang}.{target_language.lower()}{suffix}"))
+
+    seen : set[str] = set()
+    ordered : list[Path] = []
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            ordered.append(candidate)
+            seen.add(key)
+
+    for candidate in ordered:
+        if candidate.exists():
+            try:
+                candidate.rename(desired_file)
+                logger.info(f"Renamed translated subtitles from {candidate.name} to {desired_file.name}")
+                return desired_file
+            except Exception as exc:
+                logger.error(f"Failed to rename translated subtitles {candidate} -> {desired_file}: {exc}")
+                return candidate
+
+    return desired_file
+
+
+def _sync_translated_subtitles(translated_file : Path) -> None:
+    """Run ssync on the translated subtitle file."""
+    if not translated_file.exists():
+        logger.warning(f"Cannot synchronise subtitles; {translated_file} does not exist")
+        return
+
+    try:
+        subprocess.run(["ssync", str(translated_file)], check=True)
+        logger.info(f"Synchronised subtitles with ssync: {translated_file.name}")
+    except subprocess.CalledProcessError as exc:
+        logger.error(f"ssync failed for {translated_file}: {exc}")
+    except Exception as exc:
+        logger.error(f"Unexpected error running ssync for {translated_file}: {exc}")
+
+
 class TranslationMetrics:
     """Collect batched translation statistics for user feedback."""
 
@@ -368,7 +436,7 @@ def process_video_file(video_file : Path, config : MKVConfig, mode : Translation
 
     subtitle_file = video_file.with_suffix(".srt")
     lang_code = config.get_language_code(config.target_language)
-    translated_file = video_file.with_suffix(f".{lang_code}.srt")
+    translated_file = _build_translated_output_path(subtitle_file, lang_code)
 
     # Check if translated file already exists
     if translated_file.exists():
@@ -389,9 +457,14 @@ def process_video_file(video_file : Path, config : MKVConfig, mode : Translation
     try:
         translate_subtitles(subtitle_file, translated_file, config, mode, show_progress=show_progress, show_metrics=show_metrics)
 
-        # Clean up the original extracted subtitle if translation succeeded
-        if translated_file.exists() and subtitle_file.exists():
-            subtitle_file.unlink()
+        translated_file = _normalise_translated_output(subtitle_file, translated_file, config.target_language, lang_code)
+
+        if translated_file.exists():
+            _sync_translated_subtitles(translated_file)
+
+            # Clean up the original extracted subtitle if translation succeeded
+            if subtitle_file.exists():
+                subtitle_file.unlink()
 
     except Exception as e:
         logger.error(f"Translation failed: {e}")
@@ -578,8 +651,9 @@ def process_directory(config : MKVConfig, mode : TranslationMode, interactive : 
 
     for video_file in sorted_files:
         try:
+            subtitle_file = video_file.path.with_suffix(".srt")
             lang_code = config.get_language_code(config.target_language)
-            translated_file = video_file.path.with_suffix(f".{lang_code}.srt")
+            translated_file = _build_translated_output_path(subtitle_file, lang_code)
 
             if translated_file.exists():
                 console.print(
@@ -591,6 +665,7 @@ def process_directory(config : MKVConfig, mode : TranslationMode, interactive : 
                     f"[blue]⚙ Processing[/blue] {video_file.path.name}"
                 )
                 process_video_file(video_file.path, config, mode, interactive, show_progress)
+                translated_file = _normalise_translated_output(subtitle_file, translated_file, config.target_language, lang_code)
                 if translated_file.exists():
                     stats["processed"] += 1
                     console.print(
