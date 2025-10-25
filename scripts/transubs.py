@@ -45,6 +45,62 @@ FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
 
+def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path:
+    suffixes = subtitle_file.suffixes
+    extension = subtitle_file.suffix or ".srt"
+    filename = subtitle_file.name
+    lang_code = lang_code.lower()
+    if len(suffixes) >= 2:
+        language_suffix = suffixes[-2]
+        base_name = filename[: -len(language_suffix) - len(extension)]
+    else:
+        base_name = filename[: -len(extension)] if extension else filename
+    return subtitle_file.parent / f"{base_name}.{lang_code}{extension}"
+
+
+def _normalise_translated_output(subtitle_file : Path, desired_file : Path, target_language : str|None, lang_code : str) -> Path:
+    if desired_file.exists():
+        return desired_file
+    suffix = subtitle_file.suffix or ".srt"
+    stem_with_lang = subtitle_file.stem
+    candidates : list[Path] = [
+        subtitle_file.with_name(f"{stem_with_lang}.translated{suffix}"),
+        subtitle_file.with_name(f"{stem_with_lang}.{lang_code}{suffix}")
+    ]
+    if target_language:
+        candidates.append(subtitle_file.with_name(f"{stem_with_lang}.{target_language.lower()}{suffix}"))
+    seen : set[str] = set()
+    ordered : list[Path] = []
+    for c in candidates:
+        s = str(c)
+        if s not in seen:
+            ordered.append(c)
+            seen.add(s)
+    for c in ordered:
+        if c.exists():
+            try:
+                c.rename(desired_file)
+                logger.info(f"Renamed translated subtitles from {c.name} to {desired_file.name}")
+                return desired_file
+            except Exception as exc:
+                logger.error(f"Failed to rename translated subtitles {c} -> {desired_file}: {exc}")
+                return c
+    return desired_file
+
+
+def _sync_translated_subtitles(translated_file : Path) -> None:
+    if not translated_file.exists():
+        logger.warning(f"Cannot synchronise subtitles; {translated_file} does not exist")
+        return
+    try:
+        subprocess.run(["ssync", str(translated_file)], check=True)
+        logger.info(f"Synchronised subtitles with ssync: {translated_file.name}")
+    except subprocess.CalledProcessError as exc:
+        logger.error(f"ssync failed for {translated_file}: {exc}")
+    except Exception as exc:
+        logger.error(f"Unexpected error running ssync for {translated_file}: {exc}")
+
+
 class TranslationMetrics:
     """Collect batched translation statistics for user feedback."""
 
@@ -95,6 +151,18 @@ class TranslationMetrics:
         console.print(f"Throughput: {lines_per_min:.1f} lines/min ({elapsed_seconds:.1f}s elapsed)")
         if rate_limit:
             console.print(f"Applied rate limit: {rate_limit:.0f} RPM")
+
+    def _on_batch_translated(self, _sender, batch) -> None:
+        with self._lock:
+            self._batch_count += 1
+            self._total_lines += batch.size or 0
+            self._line_counts.append(batch.size or 0)
+            tr = getattr(batch, 'translation', None)
+            if tr and isinstance(tr.content, dict):
+                for key, bucket in (("prompt_tokens", self._prompt_tokens), ("output_tokens", self._output_tokens), ("total_tokens", self._total_tokens)):
+                    val = tr.content.get(key)
+                    if isinstance(val, (int, float)):
+                        bucket.append(int(val))
 
 
 class TranslationProgress:
@@ -157,17 +225,7 @@ class TranslationProgress:
         self.stream.flush()
         self._last_len = len(msg)
 
-    def _on_batch_translated(self, _sender, batch) -> None:
-        with self._lock:
-            self._batch_count += 1
-            self._total_lines += batch.size or 0
-            self._line_counts.append(batch.size or 0)
-            tr = getattr(batch, 'translation', None)
-            if tr and isinstance(tr.content, dict):
-                for key, bucket in (("prompt_tokens", self._prompt_tokens), ("output_tokens", self._output_tokens), ("total_tokens", self._total_tokens)):
-                    val = tr.content.get(key)
-                    if isinstance(val, (int, float)):
-                        bucket.append(int(val))
+    
 
 
 def _normalise_model_name(model : str|None) -> str|None:
@@ -302,12 +360,11 @@ def translate_srt_file(sub_file : Path, target_language : str|None, provider_fla
 
     # Create project on the input file
     project = SubtitleProject(persistent=False)
-    output = None
-    if target_language:
-        # Decide output path like exsubs: add language code suffix
-        lang_code = MKVConfig.get_language_code(target_language)
-        output = str(sub_file.with_suffix(f".{lang_code}.srt"))
-    project.InitialiseProject(str(sub_file), output)
+    # Decide output path: replace existing language segment with target code
+    effective_language = target_language or MKVConfig().target_language
+    lang_code = MKVConfig.get_language_code(effective_language)
+    desired_path = _build_translated_output_path(sub_file, lang_code)
+    project.InitialiseProject(str(sub_file), str(desired_path))
     project.UpdateProjectSettings(options)
 
     # Batch subtitles
@@ -338,6 +395,10 @@ def translate_srt_file(sub_file : Path, target_language : str|None, provider_fla
         if metrics:
             metrics.detach(translator)
             metrics.render(time.perf_counter() - start, total_lines, total_batches, rate_limit)
+    # Normalise file name and run ssync if we have a file
+    normalised = _normalise_translated_output(sub_file, desired_path, target_language, lang_code)
+    if normalised.exists():
+        _sync_translated_subtitles(normalised)
 
 
 def main() -> int:

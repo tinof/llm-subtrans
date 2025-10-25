@@ -178,6 +178,23 @@ class TranslationMetrics:
         if rate_limit:
             console.print(f"Applied rate limit: {rate_limit:.0f} RPM")
 
+    def _on_batch_translated(self, _sender, batch) -> None:
+        with self._lock:
+            line_count = batch.size or 0
+            self._batch_count += 1
+            self._total_lines += line_count
+            self._line_counts.append(line_count)
+
+            translation = getattr(batch, "translation", None)
+            if translation and isinstance(translation.content, dict):
+                self._append_token(self._prompt_tokens, translation.content.get('prompt_tokens'))
+                self._append_token(self._output_tokens, translation.content.get('output_tokens'))
+                self._append_token(self._total_tokens, translation.content.get('total_tokens'))
+
+    def _append_token(self, bucket: list[int], value):
+        if isinstance(value, (int, float)):
+            bucket.append(int(value))
+
 
 class TranslationProgress:
     """Lightweight progress line updated on translation events."""
@@ -240,22 +257,7 @@ class TranslationProgress:
         self.stream.flush()
         self._last_len = len(msg)
 
-    def _on_batch_translated(self, _sender, batch) -> None:
-        with self._lock:
-            line_count = batch.size or 0
-            self._batch_count += 1
-            self._total_lines += line_count
-            self._line_counts.append(line_count)
-
-            translation = getattr(batch, "translation", None)
-            if translation and isinstance(translation.content, dict):
-                self._append_token(self._prompt_tokens, translation.content.get('prompt_tokens'))
-                self._append_token(self._output_tokens, translation.content.get('output_tokens'))
-                self._append_token(self._total_tokens, translation.content.get('total_tokens'))
-
-    def _append_token(self, bucket: list[int], value):
-        if isinstance(value, (int, float)):
-            bucket.append(int(value))
+    
 
 
 def _normalise_model_name(model: str|None) -> str|None:
