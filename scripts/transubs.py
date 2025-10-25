@@ -203,7 +203,8 @@ class TranslationProgress:
         self._done_lines += batch.size or 0
         self._render()
 
-    def _on_scene(self, _s, _scene):
+    def _on_scene(self, _s, **kwargs):
+        # Accept keyword argument 'scene' from signal
         self._done_scenes += 1
         self._render()
 
