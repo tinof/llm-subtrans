@@ -25,7 +25,7 @@ from PySubtrans.MKV import (
     preprocess_timecodes,
     postprocess_timecodes,
     filter_subtitles,
-    run_diagnostics
+    run_diagnostics,
 )
 
 from PySubtrans import init_translator
@@ -56,7 +56,7 @@ FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
 
-def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path:
+def _build_translated_output_path(subtitle_file: Path, lang_code: str) -> Path:
     """Generate output path replacing existing language suffix with target code."""
     suffixes = subtitle_file.suffixes
     extension = subtitle_file.suffix or ".srt"
@@ -73,23 +73,29 @@ def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path
     return subtitle_file.parent / f"{base_name}.{lang_code}{extension}"
 
 
-def _normalise_translated_output(subtitle_file : Path, desired_file : Path, target_language : str|None, lang_code : str) -> Path:
+def _normalise_translated_output(
+    subtitle_file: Path, desired_file: Path, target_language: str | None, lang_code: str
+) -> Path:
     """Ensure translated subtitles end up at the desired path."""
     if desired_file.exists():
         return desired_file
 
     suffix = subtitle_file.suffix or ".srt"
     stem_with_lang = subtitle_file.stem
-    candidates : list[Path] = [
+    candidates: list[Path] = [
         subtitle_file.with_name(f"{stem_with_lang}.translated{suffix}"),
-        subtitle_file.with_name(f"{stem_with_lang}.{lang_code}{suffix}")
+        subtitle_file.with_name(f"{stem_with_lang}.{lang_code}{suffix}"),
     ]
 
     if target_language:
-        candidates.append(subtitle_file.with_name(f"{stem_with_lang}.{target_language.lower()}{suffix}"))
+        candidates.append(
+            subtitle_file.with_name(
+                f"{stem_with_lang}.{target_language.lower()}{suffix}"
+            )
+        )
 
-    seen : set[str] = set()
-    ordered : list[Path] = []
+    seen: set[str] = set()
+    ordered: list[Path] = []
     for candidate in candidates:
         key = str(candidate)
         if key not in seen:
@@ -100,19 +106,25 @@ def _normalise_translated_output(subtitle_file : Path, desired_file : Path, targ
         if candidate.exists():
             try:
                 candidate.rename(desired_file)
-                logger.info(f"Renamed translated subtitles from {candidate.name} to {desired_file.name}")
+                logger.info(
+                    f"Renamed translated subtitles from {candidate.name} to {desired_file.name}"
+                )
                 return desired_file
             except Exception as exc:
-                logger.error(f"Failed to rename translated subtitles {candidate} -> {desired_file}: {exc}")
+                logger.error(
+                    f"Failed to rename translated subtitles {candidate} -> {desired_file}: {exc}"
+                )
                 return candidate
 
     return desired_file
 
 
-def _sync_translated_subtitles(translated_file : Path) -> None:
+def _sync_translated_subtitles(translated_file: Path) -> None:
     """Run ssync on the translated subtitle file."""
     if not translated_file.exists():
-        logger.warning(f"Cannot synchronise subtitles; {translated_file} does not exist")
+        logger.warning(
+            f"Cannot synchronise subtitles; {translated_file} does not exist"
+        )
         return
 
     try:
@@ -152,14 +164,24 @@ class TranslationMetrics:
     def has_data(self) -> bool:
         return self._batch_count > 0
 
-    def render(self, elapsed_seconds: float, expected_lines: int, expected_batches: int, rate_limit: float|None):
+    def render(
+        self,
+        elapsed_seconds: float,
+        expected_lines: int,
+        expected_batches: int,
+        rate_limit: float | None,
+    ):
         if not self.has_data():
             return
 
         avg_lines = statistics.fmean(self._line_counts) if self._line_counts else 0.0
         max_lines = max(self._line_counts) if self._line_counts else 0
-        avg_prompt = statistics.fmean(self._prompt_tokens) if self._prompt_tokens else 0.0
-        avg_output = statistics.fmean(self._output_tokens) if self._output_tokens else 0.0
+        avg_prompt = (
+            statistics.fmean(self._prompt_tokens) if self._prompt_tokens else 0.0
+        )
+        avg_output = (
+            statistics.fmean(self._output_tokens) if self._output_tokens else 0.0
+        )
         avg_total = statistics.fmean(self._total_tokens) if self._total_tokens else 0.0
         max_total = max(self._total_tokens) if self._total_tokens else 0
 
@@ -168,13 +190,21 @@ class TranslationMetrics:
             lines_per_minute = (self._total_lines / elapsed_seconds) * 60.0
 
         console.print("\n[bold]Gemini Translation Metrics[/bold]")
-        console.print(f"Batches translated: {self._batch_count}/{expected_batches or self._batch_count}")
-        console.print(f"Lines processed: {self._total_lines}/{expected_lines or self._total_lines}")
+        console.print(
+            f"Batches translated: {self._batch_count}/{expected_batches or self._batch_count}"
+        )
+        console.print(
+            f"Lines processed: {self._total_lines}/{expected_lines or self._total_lines}"
+        )
         console.print(f"Lines per batch (avg/max): {avg_lines:.1f}/{max_lines}")
         if self._total_tokens:
-            console.print(f"Token usage avg (prompt/output/total): {avg_prompt:.0f}/{avg_output:.0f}/{avg_total:.0f}")
+            console.print(
+                f"Token usage avg (prompt/output/total): {avg_prompt:.0f}/{avg_output:.0f}/{avg_total:.0f}"
+            )
             console.print(f"Peak total tokens: {max_total}")
-        console.print(f"Throughput: {lines_per_minute:.1f} lines/min ({elapsed_seconds:.1f}s elapsed)")
+        console.print(
+            f"Throughput: {lines_per_minute:.1f} lines/min ({elapsed_seconds:.1f}s elapsed)"
+        )
         if rate_limit:
             console.print(f"Applied rate limit: {rate_limit:.0f} RPM")
 
@@ -187,9 +217,15 @@ class TranslationMetrics:
 
             translation = getattr(batch, "translation", None)
             if translation and isinstance(translation.content, dict):
-                self._append_token(self._prompt_tokens, translation.content.get('prompt_tokens'))
-                self._append_token(self._output_tokens, translation.content.get('output_tokens'))
-                self._append_token(self._total_tokens, translation.content.get('total_tokens'))
+                self._append_token(
+                    self._prompt_tokens, translation.content.get("prompt_tokens")
+                )
+                self._append_token(
+                    self._output_tokens, translation.content.get("output_tokens")
+                )
+                self._append_token(
+                    self._total_tokens, translation.content.get("total_tokens")
+                )
 
     def _append_token(self, bucket: list[int], value):
         if isinstance(value, (int, float)):
@@ -198,9 +234,10 @@ class TranslationMetrics:
 
 class TranslationProgress:
     """Lightweight progress line updated on translation events."""
+
     def __init__(self, stream=None):
         self.stream = stream or sys.stdout
-        self._file : Path|None = None
+        self._file: Path | None = None
         self._total_scenes = 0
         self._done_scenes = 0
         self._total_batches = 0
@@ -209,14 +246,14 @@ class TranslationProgress:
         self._done_lines = 0
         self._last_len = 0
 
-    def attach(self, translator, file_path : Path, total_lines : int):
+    def attach(self, translator, file_path: Path, total_lines: int):
         self._file = file_path
         self._total_lines = total_lines
         translator.events.preprocessed.connect(self._on_pre)
         translator.events.batch_translated.connect(self._on_batch)
         translator.events.scene_translated.connect(self._on_scene)
 
-    def detach(self, translator, final : bool = False):
+    def detach(self, translator, final: bool = False):
         try:
             translator.events.preprocessed.disconnect(self._on_pre)
             translator.events.batch_translated.disconnect(self._on_batch)
@@ -240,7 +277,7 @@ class TranslationProgress:
         self._done_scenes += 1
         self._render()
 
-    def _render(self, final : bool = False):
+    def _render(self, final: bool = False):
         if not self._file:
             return
         parts = [
@@ -258,16 +295,14 @@ class TranslationProgress:
         self.stream.flush()
         self._last_len = len(msg)
 
-    
 
-
-def _normalise_model_name(model: str|None) -> str|None:
+def _normalise_model_name(model: str | None) -> str | None:
     if not model:
         return None
-    return model.lower().split('/')[-1]
+    return model.lower().split("/")[-1]
 
 
-def _determine_gemini_rate_limit(model: str|None) -> float:
+def _determine_gemini_rate_limit(model: str | None) -> float:
     normalised = _normalise_model_name(model)
     if normalised == GEMINI_FLASH_MODEL_SUFFIX:
         return GEMINI_FLASH_RATE_LIMIT
@@ -282,13 +317,23 @@ def _using_vertex() -> bool:
     return value.lower() in {"1", "true", "yes", "on"}
 
 
-def _detect_gcloud_project() -> str|None:
-    for key in ("VERTEX_PROJECT", "GEMINI_VERTEX_PROJECT", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT"):
+def _detect_gcloud_project() -> str | None:
+    for key in (
+        "VERTEX_PROJECT",
+        "GEMINI_VERTEX_PROJECT",
+        "GOOGLE_CLOUD_PROJECT",
+        "GCLOUD_PROJECT",
+    ):
         value = os.getenv(key)
         if value:
             return value
     try:
-        result = subprocess.run(["gcloud", "config", "get-value", "project", "--quiet"], capture_output=True, text=True, timeout=2)
+        result = subprocess.run(
+            ["gcloud", "config", "get-value", "project", "--quiet"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
         proj = (result.stdout or "").strip()
         if proj and proj != "(unset)":
             return proj
@@ -297,12 +342,37 @@ def _detect_gcloud_project() -> str|None:
     return None
 
 
-def _vertex_project() -> str|None:
+def _vertex_project() -> str | None:
     return _detect_gcloud_project()
 
 
-def _vertex_location() -> str|None:
-    return os.getenv("VERTEX_LOCATION") or os.getenv("GEMINI_VERTEX_LOCATION") or "europe-west1"
+def _vertex_location() -> str | None:
+    return (
+        os.getenv("VERTEX_LOCATION")
+        or os.getenv("GEMINI_VERTEX_LOCATION")
+        or "europe-west1"
+    )
+
+
+def _env_default_mode() -> TranslationMode | None:
+    """Resolve default mode from environment.
+
+    Honors `LLMSUBTRANS_DEFAULT_MODE` (preferred) and `EXSUBS_DEFAULT_MODE`.
+    Accepted values (case-insensitive): gemini, gpt/openai/chatgpt, claude, deepseek.
+    """
+    raw = os.getenv("LLMSUBTRANS_DEFAULT_MODE") or os.getenv("EXSUBS_DEFAULT_MODE")
+    if not raw:
+        return None
+    key = raw.strip().lower()
+    if key in {"gpt", "openai", "chatgpt"}:
+        return TranslationMode.CHATGPT
+    if key in {"gemini", "google", "vertex"}:
+        return TranslationMode.GEMINI
+    if key in {"claude", "anthropic"}:
+        return TranslationMode.CLAUDE
+    if key in {"deepseek"}:
+        return TranslationMode.DEEPSEEK
+    return None
 
 
 def verify_dependencies():
@@ -328,7 +398,7 @@ def _detect_shell_profile() -> Path:
     return home / ".profile"
 
 
-def _find_gcloud() -> str|None:
+def _find_gcloud() -> str | None:
     path = shutil.which("gcloud")
     if path:
         return path
@@ -345,7 +415,7 @@ def _find_gcloud() -> str|None:
     return None
 
 
-def setup_vertex(yes : bool = False) -> int:
+def setup_vertex(yes: bool = False) -> int:
     """Interactive (or --yes) setup assistant for Vertex Gemini.
 
     - Verifies gcloud availability and ADC.
@@ -357,32 +427,47 @@ def setup_vertex(yes : bool = False) -> int:
     # 1) gcloud
     gcloud_path = _find_gcloud()
     if not gcloud_path:
-        console.print("[red]gcloud not found on PATH[/red]. Install Google Cloud CLI and re-run: https://cloud.google.com/sdk/docs/install")
+        console.print(
+            "[red]gcloud not found on PATH[/red]. Install Google Cloud CLI and re-run: https://cloud.google.com/sdk/docs/install"
+        )
         return 1
     console.print(f"gcloud: [cyan]{gcloud_path}[/cyan]")
 
     # 2) ADC check (no token printed)
     adc_ok = False
     try:
-        result = subprocess.run([gcloud_path, "auth", "application-default", "print-access-token"], capture_output=True, text=True, timeout=5)
+        result = subprocess.run(
+            [gcloud_path, "auth", "application-default", "print-access-token"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         adc_ok = result.returncode == 0 and bool((result.stdout or "").strip())
     except Exception:
         adc_ok = False
     if not adc_ok:
-        console.print("[yellow]No Application Default Credentials detected[/yellow]. Run: [bold]gcloud auth application-default login[/bold] and try again.")
+        console.print(
+            "[yellow]No Application Default Credentials detected[/yellow]. Run: [bold]gcloud auth application-default login[/bold] and try again."
+        )
         # continue; we can still set exports
 
     # 3) Detect project
     project = _detect_gcloud_project()
     if not project:
-        console.print("[yellow]No default GCP project detected[/yellow]. You can set one with: [bold]gcloud config set project <PROJECT_ID>[/bold]")
-        project = console.input("Enter project id to use (or leave blank to skip): ").strip() if not yes else ""
+        console.print(
+            "[yellow]No default GCP project detected[/yellow]. You can set one with: [bold]gcloud config set project <PROJECT_ID>[/bold]"
+        )
+        project = (
+            console.input("Enter project id to use (or leave blank to skip): ").strip()
+            if not yes
+            else ""
+        )
 
     # 4) Decide region/model
     region = os.getenv("VERTEX_LOCATION") or "europe-west1"
     model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
 
-    exports : list[str] = [
+    exports: list[str] = [
         "export GEMINI_USE_VERTEX=true",
         f"export VERTEX_LOCATION={region}",
         f"export GEMINI_MODEL={model}",
@@ -394,7 +479,11 @@ def setup_vertex(yes : bool = False) -> int:
 
     do_write = yes
     if not do_write:
-        choice = console.input("Write these to your shell profile to persist? [y/N]: ").strip().lower()
+        choice = (
+            console.input("Write these to your shell profile to persist? [y/N]: ")
+            .strip()
+            .lower()
+        )
         do_write = choice in {"y", "yes"}
 
     if do_write:
@@ -416,19 +505,27 @@ def setup_vertex(yes : bool = False) -> int:
     return 0
 
 
-def verify_api_key(mode : TranslationMode):
+def verify_api_key(mode: TranslationMode):
     """Verify required API key is set based on translation mode"""
     if mode == TranslationMode.GEMINI and _using_vertex():
         return
 
     from PySubtrans.MKV.Config import MODE_TO_ENV
+
     required_key = MODE_TO_ENV[mode]
     if not os.getenv(required_key):
         logger.error(f"{required_key} not found in environment")
         sys.exit(1)
 
 
-def process_video_file(video_file : Path, config : MKVConfig, mode : TranslationMode, interactive : bool, show_progress : bool, show_metrics : bool = True):
+def process_video_file(
+    video_file: Path,
+    config: MKVConfig,
+    mode: TranslationMode,
+    interactive: bool,
+    show_progress: bool,
+    show_metrics: bool = True,
+):
     """Process a single video file - extract and translate subtitles"""
     logger.info(f"Processing {video_file}")
 
@@ -458,9 +555,18 @@ def process_video_file(video_file : Path, config : MKVConfig, mode : Translation
 
     # Translate subtitles using PySubtrans API
     try:
-        translate_subtitles(subtitle_file, translated_file, config, mode, show_progress=show_progress, show_metrics=show_metrics)
+        translate_subtitles(
+            subtitle_file,
+            translated_file,
+            config,
+            mode,
+            show_progress=show_progress,
+            show_metrics=show_metrics,
+        )
 
-        translated_file = _normalise_translated_output(subtitle_file, translated_file, config.target_language, lang_code)
+        translated_file = _normalise_translated_output(
+            subtitle_file, translated_file, config.target_language, lang_code
+        )
 
         if translated_file.exists():
             _sync_translated_subtitles(translated_file)
@@ -474,7 +580,9 @@ def process_video_file(video_file : Path, config : MKVConfig, mode : Translation
         raise
 
 
-def extract_subtitles(video_file : Path, subtitle_file : Path, interactive : bool, show_progress : bool) -> bool:
+def extract_subtitles(
+    video_file: Path, subtitle_file: Path, interactive: bool, show_progress: bool
+) -> bool:
     """Extract subtitles from MKV file using mkvextract"""
     if not video_file.suffix.lower() == ".mkv":
         logger.error(f"Only MKV files are supported, got: {video_file.suffix}")
@@ -497,7 +605,9 @@ def extract_subtitles(video_file : Path, subtitle_file : Path, interactive : boo
         if interactive:
             logger.info("No subtitle track selected")
         else:
-            logger.error(f"No suitable subtitle track found in {video_file} (tried English and French)")
+            logger.error(
+                f"No suitable subtitle track found in {video_file} (tried English and French)"
+            )
             logger.info("Available tracks:")
             for track in subtitle_tracks:
                 title = track.get("tags", {}).get("title", "No title")
@@ -511,14 +621,21 @@ def extract_subtitles(video_file : Path, subtitle_file : Path, interactive : boo
     )
 
 
-def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mode : TranslationMode, show_progress : bool = True, show_metrics : bool = True):
+def translate_subtitles(
+    sub_file: Path,
+    out_file: Path,
+    config: MKVConfig,
+    mode: TranslationMode,
+    show_progress: bool = True,
+    show_metrics: bool = True,
+):
     """Translate subtitles using PySubtrans API"""
     from PySubtrans.MKV.Config import MODE_TO_DEFAULT_MODEL, MODE_TO_RATE_LIMIT
 
     # Map mode to provider name
     provider_map = {
         TranslationMode.GEMINI: "Gemini",
-        TranslationMode.CHATGPT: "ChatGPT",
+        TranslationMode.CHATGPT: "OpenAI",
         TranslationMode.CLAUDE: "Claude",
         TranslationMode.DEEPSEEK: "DeepSeek",
     }
@@ -526,40 +643,60 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
     provider = provider_map.get(mode, "Gemini")
     model = MODE_TO_DEFAULT_MODEL[mode]
     # Defaults; overridable by environment or model-specific logic below
-    scene_threshold = float(os.getenv('SCENE_THRESHOLD') or 60.0)
-    min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or 10)
-    max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or 50)
-    max_context_summaries = int(os.getenv('MAX_CONTEXT_SUMMARIES') or 10)
-    rate_limit : float|None = None
+    scene_threshold = float(os.getenv("SCENE_THRESHOLD") or 60.0)
+    min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or 10)
+    max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or 50)
+    max_context_summaries = int(os.getenv("MAX_CONTEXT_SUMMARIES") or 10)
+    rate_limit: float | None = None
 
     if mode == TranslationMode.GEMINI:
-        model = os.getenv('GEMINI_MODEL') or GEMINI_DEFAULT_MODEL
+        model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
 
         # Model-specific tuned defaults (overridable by env)
         normalised = _normalise_model_name(model)
         if normalised == GEMINI_FLASH_MODEL_SUFFIX:
-            scene_threshold = float(os.getenv('SCENE_THRESHOLD') or FLASH_SCENE_THRESHOLD)
-            min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or FLASH_MIN_BATCH_SIZE)
-            max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or FLASH_MAX_BATCH_SIZE)
+            scene_threshold = float(
+                os.getenv("SCENE_THRESHOLD") or FLASH_SCENE_THRESHOLD
+            )
+            min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE)
+            max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE)
         else:
-            scene_threshold = float(os.getenv('SCENE_THRESHOLD') or GEMINI_SCENE_THRESHOLD)
-            min_batch_size = int(os.getenv('MIN_BATCH_SIZE') or GEMINI_MIN_BATCH_SIZE)
-            max_batch_size = int(os.getenv('MAX_BATCH_SIZE') or GEMINI_MAX_BATCH_SIZE)
+            scene_threshold = float(
+                os.getenv("SCENE_THRESHOLD") or GEMINI_SCENE_THRESHOLD
+            )
+            min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE)
+            max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE)
 
-        max_context_summaries = int(os.getenv('MAX_CONTEXT_SUMMARIES') or GEMINI_MAX_CONTEXT_SUMMARIES)
+        max_context_summaries = int(
+            os.getenv("MAX_CONTEXT_SUMMARIES") or GEMINI_MAX_CONTEXT_SUMMARIES
+        )
         rate_limit = _determine_gemini_rate_limit(model)
 
-        os.environ.setdefault('GEMINI_RATE_LIMIT', str(int(rate_limit)))
+        os.environ.setdefault("GEMINI_RATE_LIMIT", str(int(rate_limit)))
 
         use_vertex = _using_vertex()
-        settings_vertex : dict[str,str|bool] = {'use_vertex': use_vertex}
+        settings_vertex: dict[str, str | bool] = {"use_vertex": use_vertex}
         if use_vertex:
             project = _vertex_project()
             location = _vertex_location()
             if project:
-                settings_vertex['vertex_project'] = project
+                settings_vertex["vertex_project"] = project
             if location:
-                settings_vertex['vertex_location'] = location
+                settings_vertex["vertex_location"] = location
+    elif mode == TranslationMode.CHATGPT:
+        model = os.getenv("OPENAI_MODEL") or "gpt-5-mini"
+        scene_threshold = float(os.getenv("SCENE_THRESHOLD") or 120.0)
+        min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or 30)
+        max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or 100)
+        max_context_summaries = int(os.getenv("MAX_CONTEXT_SUMMARIES") or 6)
+        settings_vertex = {}
+        try:
+            base_rate = os.getenv("OPENAI_RATE_LIMIT") or MODE_TO_RATE_LIMIT.get(
+                mode, ""
+            )
+            rate_limit = float(base_rate) if base_rate else None
+        except ValueError:
+            rate_limit = None
     else:
         rate_value = MODE_TO_RATE_LIMIT.get(mode)
         if rate_value:
@@ -571,27 +708,27 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
 
     # Create PySubtrans options
     settings = {
-        'provider': provider,
-        'target_language': config.target_language,
-        'temperature': 0.2,
-        'preprocess_subtitles': True,
-        'postprocess_subtitles': True,
-        'model': model,
-        'scene_threshold': scene_threshold,
-        'min_batch_size': min_batch_size,
-        'max_batch_size': max_batch_size,
-        'max_context_summaries': max_context_summaries,
+        "provider": provider,
+        "target_language": config.target_language,
+        "temperature": 0.2,
+        "preprocess_subtitles": True,
+        "postprocess_subtitles": True,
+        "model": model,
+        "scene_threshold": scene_threshold,
+        "min_batch_size": min_batch_size,
+        "max_batch_size": max_batch_size,
+        "max_context_summaries": max_context_summaries,
     }
 
     if rate_limit:
-        settings['rate_limit'] = rate_limit
+        settings["rate_limit"] = rate_limit
 
     if settings_vertex:
         settings.update(settings_vertex)
 
     # Set instruction file if it exists
     if config.instruction_file and config.instruction_file.exists():
-        settings['instructionfile'] = str(config.instruction_file)
+        settings["instructionfile"] = str(config.instruction_file)
 
     options = Options(settings)
 
@@ -602,19 +739,28 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
 
     # Batch subtitles for translation
     from PySubtrans import batch_subtitles
+
     batch_subtitles(
         project.subtitles,
         scene_threshold=scene_threshold,
         min_batch_size=min_batch_size,
-        max_batch_size=max_batch_size
+        max_batch_size=max_batch_size,
     )
 
-    total_batches = sum(len(scene.batches) for scene in project.subtitles.scenes) if project.subtitles and project.subtitles.scenes else 0
+    total_batches = (
+        sum(len(scene.batches) for scene in project.subtitles.scenes)
+        if project.subtitles and project.subtitles.scenes
+        else 0
+    )
     total_lines = project.subtitles.linecount if project.subtitles else 0
 
     # Translate
     translator = init_translator(options)
-    metrics = TranslationMetrics() if (show_metrics and mode == TranslationMode.GEMINI) else None
+    metrics = (
+        TranslationMetrics()
+        if (show_metrics and mode == TranslationMode.GEMINI)
+        else None
+    )
     progress = TranslationProgress() if show_progress else None
     start_time = time.perf_counter()
     try:
@@ -632,7 +778,9 @@ def translate_subtitles(sub_file : Path, out_file : Path, config : MKVConfig, mo
             metrics.render(elapsed, total_lines, total_batches, rate_limit)
 
 
-def process_directory(config : MKVConfig, mode : TranslationMode, interactive : bool, show_progress : bool):
+def process_directory(
+    config: MKVConfig, mode: TranslationMode, interactive: bool, show_progress: bool
+):
     """Process all MKV files in the current directory"""
     # Get all MKV files and sort them
     video_files = list(Path().glob("*.mkv"))
@@ -664,27 +812,23 @@ def process_directory(config : MKVConfig, mode : TranslationMode, interactive : 
                 )
                 stats["skipped"] += 1
             else:
-                console.print(
-                    f"[blue]⚙ Processing[/blue] {video_file.path.name}"
+                console.print(f"[blue]⚙ Processing[/blue] {video_file.path.name}")
+                process_video_file(
+                    video_file.path, config, mode, interactive, show_progress
                 )
-                process_video_file(video_file.path, config, mode, interactive, show_progress)
-                translated_file = _normalise_translated_output(subtitle_file, translated_file, config.target_language, lang_code)
+                translated_file = _normalise_translated_output(
+                    subtitle_file, translated_file, config.target_language, lang_code
+                )
                 if translated_file.exists():
                     stats["processed"] += 1
-                    console.print(
-                        f"[green]✓ Completed[/green] {video_file.path.name}"
-                    )
+                    console.print(f"[green]✓ Completed[/green] {video_file.path.name}")
                 else:
                     stats["failed"] += 1
-                    console.print(
-                        f"[red]✗ Failed[/red] {video_file.path.name}"
-                    )
+                    console.print(f"[red]✗ Failed[/red] {video_file.path.name}")
 
         except Exception as e:
             stats["failed"] += 1
-            logger.error(
-                f"Error processing {video_file.path.name}: {str(e)}"
-            )
+            logger.error(f"Error processing {video_file.path.name}: {str(e)}")
 
         console.print("─" * 40)
 
@@ -737,27 +881,31 @@ def main():
         "--no-progress", action="store_true", help="Disable progress bars"
     )
     parser.add_argument(
-        "--no-metrics", action="store_true", help="Do not print end-of-run translation metrics"
+        "--no-metrics",
+        action="store_true",
+        help="Do not print end-of-run translation metrics",
     )
     parser.add_argument(
-        "-i", "--interactive",
+        "-i",
+        "--interactive",
         action="store_true",
-        help="Interactive mode - manually select subtitle track to extract"
+        help="Interactive mode - manually select subtitle track to extract",
     )
     parser.add_argument(
         "--diagnose",
         action="store_true",
-        help="Run system diagnostics to identify performance bottlenecks"
+        help="Run system diagnostics to identify performance bottlenecks",
     )
     parser.add_argument(
         "--setup-vertex",
         action="store_true",
-        help="Verify Google Cloud CLI + ADC and write persistent Vertex defaults to your shell profile"
+        help="Verify Google Cloud CLI + ADC and write persistent Vertex defaults to your shell profile",
     )
     parser.add_argument(
-        "-y", "--yes",
+        "-y",
+        "--yes",
         action="store_true",
-        help="Answer yes to prompts during --setup-vertex"
+        help="Answer yes to prompts during --setup-vertex",
     )
     args = parser.parse_args()
 
@@ -778,12 +926,15 @@ def main():
     if args.language:
         if args.language not in MKVConfig.SUPPORTED_LANGUAGES:
             logger.error(f"Unsupported language: {args.language}")
-            logger.info(f"Supported languages: {', '.join(MKVConfig.SUPPORTED_LANGUAGES)}")
+            logger.info(
+                f"Supported languages: {', '.join(MKVConfig.SUPPORTED_LANGUAGES)}"
+            )
             sys.exit(1)
         config.target_language = args.language
 
     # Determine translation mode
-    mode = args.mode or config.default_translation_mode
+    env_mode = _env_default_mode()
+    mode = args.mode or env_mode or config.default_translation_mode
 
     # Verify dependencies
     verify_dependencies()
@@ -803,7 +954,14 @@ def main():
 
                 if args.file:
                     # Process single file
-                    process_video_file(Path(args.file), config, mode, args.interactive, show_progress, show_metrics)
+                    process_video_file(
+                        Path(args.file),
+                        config,
+                        mode,
+                        args.interactive,
+                        show_progress,
+                        show_metrics,
+                    )
                 else:
                     # Process all MKV files in current directory
                     process_directory(config, mode, args.interactive, show_progress)
@@ -824,5 +982,5 @@ def main():
             lock.release()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())
