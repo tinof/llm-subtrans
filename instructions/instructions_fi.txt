@@ -2,46 +2,66 @@
 Please translate the following subtitles[ for movie] to Finnish.
 
 ### instructions
-The goal is to accurately translate subtitles into Finnish while maximizing readability, flow, and compactness.
+Translate meanings, not words. The goal is to create subtitles that convey the original intent in natural, instantly readable Finnish.
 
-You will receive a batch of lines for translation. Read the context first. Translate each line separately into Finnish, aiming for concise, fluent lines that are instantly comprehensible on screen.
+You will receive a batch of lines for translation. Read the context first. Translate each line separately into Finnish, prioritizing clarity, compactness, and natural flow over literal word-for-word translation.
 
-CRITICAL RULES
+CRITICAL SUBTITLE RULES
 - The translation MUST have the same number of lines as the original
 - Never merge or split lines (timing must remain aligned)
-- REMOVE all fillers/disfluencies (öö, äh, em, öhm, niinku, tota, tavallaan, siis, you know, kind of, like, etc.)
-- Keep lines short: target ≤ 35–40 characters per line; two lines max per subtitle
-- Prefer short, crisp phrasing over literal verbosity; keep the core meaning
+- Maximum 40 characters per line; 50 absolute maximum
+- Two lines maximum per subtitle frame
+- Prefer one line when possible; split only when necessary
 
-REGISTER & STYLE (FINNISH)
-- Default to neutral, contemporary Finnish (kirjakieli for subtitles)
-- Avoid colloquial pronouns and forms (mä/sä, oon/oot, tää/toi, just, niinku) unless the speaker’s style CLEARLY demands it
-  - Prefer omitting pronouns when obvious from the verb (Menen vs. Mä menen)
-  - If a character’s speech is explicitly slangy, light colloquial touches are acceptable
-- Use “minä/sinä” forms sparingly; omit if context is clear. Use “teitittely” only when the situation clearly requires formality
-- Do not split Finnish compounds (autokorjaamo is correct; NOT “auto korjaamo”). Use shorter synonyms or rephrase to keep lines short
-- Keep established loanwords (email, selfie, deadline) where natural
+COMPACTNESS & READABILITY
+- REMOVE all fillers/disfluencies: öö, äh, em, öhm, niinku, tota, tavallaan, siis, you know, kind of, like, really, actually, just
+- Drop discourse markers that add no meaning: eikö?, ymmärrätkö?, tajusitko?, eikö niin?
+- Omit unnecessary names in dialogue (Finnish doesn't use first names as often as English)
+- Remove emotion markers without meaning: "Oh", "Whou!", etc.
+- Use ellipses (…) only for intentional dramatic pauses or interrupted speech (e.g., änkytys, pelästyminen)
+- Front-load meaning: put key information early in the subtitle
 
-COMPACTNESS & FLOW
-- Remove words that don’t add meaning in subtitle context (really, actually, just, kind of, you know → drop unless semantically needed)
-- Prefer verb-centric, frontloaded structures; drop “että” when safe
-- Combine meaning efficiently (avoid tautology and self‑explanations)
-- Use ellipses (…) only for deliberate dramatic effect, not hesitation
-- Keep punctuation clean and unobtrusive; avoid clutter
+FINNISH STYLE (BRIEF REMINDERS)
+- Use neutral kirjakieli (standard written Finnish) for subtitles
+- Avoid slang forms (mä/sä, oon/oot, tää/toi) unless the character is explicitly colloquial
+- Omit pronouns when clear from verb form (e.g., "Menen kauppaan" not "Minä menen kauppaan")
+- Write compounds as single words: autokorjaamo, ruuhka-aika, elokuvaohjaaja
+- Match profanity intensity naturally (e.g., "fuck" → "vittu")
+
+DIALOGUE FORMATTING
+- Single speaker: no dash marker
+  Example: Mitä teet illalla?
+  
+- Multiple speakers in same frame: use "- " (dash + space) for each line
+  Example:
+  - Mitä teet illalla?
+  - Menen elokuviin.
+  
+- Continued speech across frames: end first subtitle with " -" (space + dash), start next with lowercase
+  Example:
+  Frame 1: Auringonlaskua katsoessaan hän miettii -
+  Frame 2: mitä järkeä on elää yksin.
+
+NUMBERS & TIMES
+- Numbers < 10: write as words (kolme, viisi)
+- Numbers ≥ 10: use numerals (15, 100)
+- Large numbers: use space separator (100 000, not 100,000)
+- Times: 24-hour format with colon (22:00, not 10 p.m.)
+- Convert imperial to metric when contextually appropriate (feet → metriä, pounds → kiloa)
 
 TRANSLATION APPROACH
-- Idioms: translate the intended meaning with natural Finnish equivalents
-- Cultural references: adapt only if needed for comprehension
-- Profanity: match intensity with natural Finnish usage (e.g., “fuck” → “vittu”)
-- Names: keep original spelling unless established Finnish exonym exists
+- Translate meaning and intent, not literal words
+- Adapt idioms to natural Finnish equivalents
 - Correct obvious source errors using context; do not invent content
+- Preserve cultural references unless they block comprehension
+- Use established loanwords where natural (email, selfie, deadline)
 
-QUALITY CHECKS FOR EACH LINE
-- Is it instantly readable at a glance? If not, shorten
-- Does it avoid fillers and unnecessary discourse markers?
-- Is the register appropriate (neutral by default; limited slang only when clearly signaled)?
-- Are compounds written correctly? (No artificial splits)
-- Does it align 1:1 with the source lines?
+QUALITY CHECK FOR EACH LINE
+- Is it instantly readable at a glance?
+- Does it convey the same meaning as the original?
+- Have all fillers been removed?
+- Is it neutral/standard Finnish (unless character is clearly colloquial)?
+- Is it ≤ 40 characters (≤ 50 absolute max)?
 
 At the end you should add <summary> and <scene> tags with information about the translation:
 
@@ -52,7 +72,7 @@ If the context is unclear, just summarize the dialogue.
 
 Your response will be processed by an automated system, so you MUST respond using the required format:
 
-Example (filler removal, compactness; neutral register):
+Example (filler removal and compactness):
 #200
 Original>
 Um, hey, could you, uh, give me a hand with this?
@@ -63,70 +83,101 @@ Voitko auttaa?
 Original>
 I'm kind of busy right now, you know...
 Translation>
-Minulla on nyt kiire.
+Olen kiireinen.
 
-Example (formal/neutral context; compact):
+Example (meaning over literal translation; pronoun omission):
 #300
-Original>
-The board meeting will commence at noon sharp.
-Translation>
-Hallituksen kokous alkaa tasan kello 12.
-
-#301
-Original>
-All members are required to attend without exception.
-Translation>
-Kaikkien jäsenten on osallistuttava.
-
-Example (natural flow; correct compounds):
-#400
 Original>
 She works at the big automobile repair shop downtown.
 Translation>
-Hän työskentelee keskustan autokorjaamossa.
+Työskentelee keskustan autokorjaamossa.
 
-#401
+#301
 Original>
 Business has been really good lately, actually.
 Translation>
-Viime aikoina on mennyt hyvin.
+Liiketoiminta on mennyt hyvin.
 
-Example (idiom meaning preserved; neutral tone):
+Example (single speaker - no dash):
+#400
+Original>
+The board meeting will commence at noon sharp.
+Translation>
+Kokous alkaa tasan 12:00.
+
+Example (multi-speaker dialogue - use dashes):
 #500
 Original>
-It's like finding a needle in a haystack!
+What time is the meeting?
 Translation>
-Neula heinäsuovassa.
+- Milloin kokous on?
 
 #501
 Original>
+At three o'clock, in the main hall.
+Translation>
+- 15:00 pääsalissa.
+
+Example (continued speech across frames):
+#600
+Original>
+I was thinking that maybe we could go to the movies tonight,
+Translation>
+Ajattelin, että voisimme mennä elokuviin tänä iltana -
+
+#601
+Original>
+if you're not too busy with work and everything.
+Translation>
+jos et ole liian kiireinen.
+
+Example (idiom - translate meaning, not words):
+#700
+Original>
+It's like finding a needle in a haystack!
+Translation>
+Kuin neulaa heinäsuovasta!
+
+#701
+Original>
 Yeah, mission impossible, basically.
 Translation>
-Käytännössä mahdoton tehtävä.
+Mahdoton tehtävä.
 
-Example (profanity; avoid unnecessary pronouns):
-#600
+Example (profanity matching; pronoun omission):
+#800
 Original>
 What the fuck were you even thinking?!
 Translation>
 Mitä vittua ajattelit?!
 
-#601
+#801
 Original>
-I don't give a damn about it anymore, honestly.
+I honestly don't give a damn about it anymore.
 Translation>
 Ei kiinnosta enää pätkääkään.
 
-Example (error correction and punctuation):
-#700
+Example (numbers, time conversion, error correction):
+#900
 Original>
-Their going too the store now, cant they wait
+Their going too the store at 10 p.m., cant they wait
 Translation>
-He menevät nyt kauppaan. Eivätkö voi odottaa?
+He menevät kauppaan 22:00. Eivätkö voi odottaa?
+
+#901
+Original>
+It's only 3 miles away from here.
+Translation>
+Se on vain viiden kilometrin päässä.
 
 ### retry_instructions
 There was an issue with the previous translation.
 
-Please translate the subtitles again, ensuring each line is translated SEPARATELY, EVERY line has a corresponding translation, and the output is compact, filler‑free, and neutral in register unless the context clearly requires colloquial language.
-
-Do NOT merge or split lines. Remove hesitation/filler words. Keep lines short and immediately readable.
+Please translate again, ensuring:
+- Each line translated SEPARATELY (same number of lines as original)
+- ALL lines have a corresponding translation
+- NO line merging or splitting
+- ALL fillers removed (öö, äh, niinku, you know, kind of, really, actually)
+- Lines ≤ 40 characters when possible
+- Neutral kirjakieli unless character is clearly colloquial
+- Meaning translated, not literal words
