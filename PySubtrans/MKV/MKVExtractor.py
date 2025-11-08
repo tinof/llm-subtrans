@@ -302,7 +302,8 @@ def extract_track_with_progress(video_file : Path, subtitle_file : Path, track_i
 
         if show_progress and console:
             # Import here to avoid requiring rich if not using progress
-            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+            import threading
 
             # Set up progress display
             progress = Progress(
@@ -310,6 +311,7 @@ def extract_track_with_progress(video_file : Path, subtitle_file : Path, track_i
                 TextColumn("[bold blue]{task.description}"),
                 BarColumn(),
                 TaskProgressColumn(),
+                TimeElapsedColumn(),
                 console=console,
             )
 
@@ -327,6 +329,34 @@ def extract_track_with_progress(video_file : Path, subtitle_file : Path, track_i
 
                 last_progress = 0
                 stderr_data = []
+                has_progress_data = False
+
+                # Monitor output file size in a separate thread for progress estimation
+                def monitor_file_progress():
+                    nonlocal last_progress, has_progress_data
+                    while process.poll() is None:
+                        try:
+                            if subtitle_file.exists():
+                                # Estimate progress based on typical subtitle file sizes
+                                # Most subtitle files are small (< 1MB), so we use time-based estimation
+                                elapsed = time.time() - start_time
+                                # Assume 95% complete after 2 seconds, then wait for actual completion
+                                estimated_progress = min(95, int(elapsed / 2.0 * 95))
+                                if estimated_progress > last_progress:
+                                    last_progress = estimated_progress
+                                    rate = file_size_mb / elapsed if elapsed > 0 else 0
+                                    progress.update(
+                                        task,
+                                        completed=estimated_progress,
+                                        description=f"Extracting subtitle from {video_file.name} ({rate:.1f} MB/s avg)"
+                                    )
+                            time.sleep(0.1)
+                        except Exception:
+                            pass
+
+                # Start file monitoring thread
+                monitor_thread = threading.Thread(target=monitor_file_progress, daemon=True)
+                monitor_thread.start()
 
                 # Read stderr line by line for progress updates
                 while True:
@@ -336,10 +366,11 @@ def extract_track_with_progress(video_file : Path, subtitle_file : Path, track_i
 
                     stderr_data.append(line)
 
-                    # Parse progress from stderr
+                    # Parse progress from stderr if available
                     if "Progress:" in line:
                         progress_match = re.search(r"Progress:\s+(\d+)%", line)
                         if progress_match:
+                            has_progress_data = True
                             progress_value = int(progress_match.group(1))
                             if progress_value > last_progress:
                                 last_progress = progress_value

@@ -732,6 +732,24 @@ def translate_subtitles(
 
     options = Options(settings)
 
+    # Display model information
+    console.print(f"\n[bold cyan]Translation Configuration:[/bold cyan]")
+    console.print(f"  Provider: {provider}")
+    console.print(f"  Model: {model}")
+    console.print(f"  Target Language: {config.target_language}")
+    if rate_limit:
+        console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
+    
+    # Display instruction file info
+    if config.instruction_file and config.instruction_file.exists():
+        console.print(f"  Instructions: {config.instruction_file}")
+    elif config.instruction_file:
+        console.print(f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]")
+    else:
+        console.print(f"  Instructions: [dim]None[/dim]")
+    
+    console.print()
+
     # Create subtitle project
     project = SubtitleProject(persistent=False)
     project.InitialiseProject(str(sub_file), str(out_file))
