@@ -11,6 +11,7 @@ import time
 
 from dotenv import load_dotenv
 from filelock import FileLock
+import regex
 from rich.console import Console
 from rich.logging import RichHandler
 
@@ -55,20 +56,33 @@ FLASH_SCENE_THRESHOLD = 300.0
 FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
+LANGUAGE_SUFFIX_PATTERN = regex.compile(r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE)
 
-def _build_translated_output_path(subtitle_file: Path, lang_code: str) -> Path:
+
+def _looks_like_language_suffix(suffix : str) -> bool:
+    """Return True if suffix resembles a language identifier."""
+    return bool(LANGUAGE_SUFFIX_PATTERN.match(suffix))
+
+
+def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path:
     """Generate output path replacing existing language suffix with target code."""
-    suffixes = subtitle_file.suffixes
     extension = subtitle_file.suffix or ".srt"
     filename = subtitle_file.name
-
     lang_code = lang_code.lower()
 
-    if len(suffixes) >= 2:
-        language_suffix = suffixes[-2]
-        base_name = filename[: -len(language_suffix) - len(extension)]
+    if extension:
+        base_name = filename[: -len(extension)]
     else:
-        base_name = filename[: -len(extension)] if extension else filename
+        base_name = filename
+
+    while True:
+        dot_index = base_name.rfind(".")
+        if dot_index == -1:
+            break
+        candidate = base_name[dot_index:]
+        if not _looks_like_language_suffix(candidate):
+            break
+        base_name = base_name[:dot_index]
 
     return subtitle_file.parent / f"{base_name}.{lang_code}{extension}"
 
