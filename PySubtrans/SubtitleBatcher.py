@@ -7,11 +7,16 @@ from PySubtrans.SubtitleLine import SubtitleLine
 class SubtitleBatcher:
     def __init__(self, settings : SettingsType):
         """ Initialize a SubtitleBatcher helper class with settings """
+        self.large_context_mode : bool = settings.get_bool('large_context_mode', False)
+        
+        default_max_batch = 2000 if self.large_context_mode else 100
+        default_scene_threshold = 300.0 if self.large_context_mode else 30.0
+
         self.min_batch_size : int = settings.get_int('min_batch_size') or 1
-        self.max_batch_size : int = settings.get_int('max_batch_size') or 100
+        self.max_batch_size : int = settings.get_int('max_batch_size') or default_max_batch
         self.fix_overlaps : bool = settings.get_bool('prevent_overlapping_times', False)
 
-        scene_threshold_seconds : float = settings.get_float('scene_threshold') or 30.0
+        scene_threshold_seconds : float = settings.get_float('scene_threshold') or default_scene_threshold
         self.scene_threshold : timedelta = timedelta(seconds=scene_threshold_seconds)
 
     def BatchSubtitles(self, lines : list[SubtitleLine]) -> list[SubtitleScene]:

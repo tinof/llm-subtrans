@@ -61,6 +61,8 @@ else:
                     "model": settings.get_str('model') or os.getenv('GEMINI_MODEL'),
                     'stream_responses': settings.get_bool('stream_responses', os.getenv('GEMINI_STREAM_RESPONSES', "True") == "True"),
                     'enable_thinking': settings.get_bool('enable_thinking', os.getenv('GEMINI_ENABLE_THINKING', "False") == "True"),
+                    'enable_thinking': settings.get_bool('enable_thinking', os.getenv('GEMINI_ENABLE_THINKING', "False") == "True"),
+                    'large_context_mode': settings.get_bool('large_context_mode', os.getenv('GEMINI_LARGE_CONTEXT_MODE', "True") == "True"),
                     'thinking_budget': settings.get_int('thinking_budget', env_int('GEMINI_THINKING_BUDGET', -1)) or -1,
                     'temperature': settings.get_float('temperature', env_float('GEMINI_TEMPERATURE', 0.0)),
                     'rate_limit': settings.get_float('rate_limit', env_float('GEMINI_RATE_LIMIT', 60.0)),
@@ -69,7 +71,7 @@ else:
                     'vertex_location': settings.get_str('vertex_location') or os.getenv('VERTEX_LOCATION') or os.getenv('GEMINI_VERTEX_LOCATION') or 'europe-west1'
                 }))
 
-                self.refresh_when_changed = ['api_key', 'model', 'enable_thinking', 'use_vertex', 'vertex_project', 'vertex_location']
+                self.refresh_when_changed = ['api_key', 'model', 'enable_thinking', 'large_context_mode', 'use_vertex', 'vertex_project', 'vertex_location']
                 self.gemini_models = []
 
             @property
@@ -122,6 +124,7 @@ else:
                             options.update({
                                 'model': (models, "AI model to use as the translator" if models else "Unable to retrieve models"),
                                 'stream_responses': (bool, _("Stream translations in realtime as they are generated")),
+                                'large_context_mode': (bool, _("Use large context mode (larger batches, richer history) - Recommended for Gemini 1.5/2.5")),
                                 'enable_thinking': (bool, _("Enable reasoning capabilities for more complex translations (increases cost)")),
                                 'temperature': (float, _("Amount of random variance to add to translations. Generally speaking, none is best")),
                                 'rate_limit': (float, _("Maximum API requests per minute."))

@@ -38,7 +38,10 @@ def GetBatchContext(subtitles: Subtitles, scene_number: int, batch_number: int, 
         if 'names' in subtitles.settings:
             context['names'] = ParseNames(subtitles.settings.get('names', []))
 
-        history_lines = GetHistory(subtitles, scene_number, batch_number, max_lines)
+        if subtitles.settings.get_bool('large_context_mode', False):
+            history_lines = GetDetailedHistory(subtitles, scene_number, batch_number, subtitles.settings.get_int('max_context_history_tokens', 10000))
+        else:
+            history_lines = GetHistory(subtitles, scene_number, batch_number, max_lines)
 
         if history_lines:
             context['history'] = history_lines
@@ -69,3 +72,50 @@ def GetHistory(subtitles: Subtitles, scene_number: int, batch_number: int, max_l
         history_lines = history_lines[-max_lines:]
 
     return history_lines
+
+
+def GetDetailedHistory(subtitles: Subtitles, scene_number: int, batch_number: int, max_tokens: int = 10000) -> list[str]:
+    """
+    Get a list of actual translated lines from previous batches up to a token limit (approximate)
+    """
+    history_lines : list[str] = []
+    
+    # Iterate backwards through batches to collect lines until we hit the limit
+    collected_lines = []
+    current_tokens = 0
+    
+    # We need to flatten the structure to iterate backwards easily
+    all_batches = []
+    for scene in subtitles.scenes:
+        if scene.number > scene_number:
+            break
+            
+        for batch in scene.batches:
+            if scene.number == scene_number and batch.number >= batch_number:
+                break
+            all_batches.append(batch)
+            
+    for batch in reversed(all_batches):
+        if not batch.translated:
+            continue
+            
+        batch_lines = []
+        for line in reversed(batch.translated):
+            text = f"{line.number}. {line.text}"
+            # Rough approximation: 1 token ~= 4 chars
+            tokens = len(text) / 4
+            
+            if current_tokens + tokens > max_tokens:
+                break
+                
+            batch_lines.insert(0, text)
+            current_tokens += tokens
+            
+        if batch_lines:
+            batch_lines.insert(0, f"--- Batch {batch.number} ---")
+            collected_lines = batch_lines + collected_lines
+            
+        if current_tokens >= max_tokens:
+            break
+            
+    return collected_lines

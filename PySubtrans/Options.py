@@ -99,6 +99,8 @@ default_settings = {
     'write_backup' : env_bool('WRITE_BACKUP_FILE', True),
     'theme' : env_str('THEME', 'default'),
     'ui_language': env_str('UI_LANGUAGE', 'en'),
+    'large_context_mode': env_bool('LARGE_CONTEXT_MODE', False),
+    'max_context_history_tokens': env_int('MAX_CONTEXT_HISTORY_TOKENS', 10000),
     'firstrun' : True
 }
 

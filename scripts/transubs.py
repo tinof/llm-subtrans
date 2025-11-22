@@ -395,21 +395,44 @@ def translate_srt_file(
     max_context_summaries = int(os.getenv("MAX_CONTEXT_SUMMARIES") or 10)
     rate_limit: float | None = None
 
+    max_context_summaries = int(os.getenv("MAX_CONTEXT_SUMMARIES") or 10)
+    rate_limit: float | None = None
+
+    # Check for large context mode
+    # Default to True for Gemini, False for others, unless explicitly set
+    env_large_context = os.getenv("LARGE_CONTEXT_MODE")
+    if env_large_context is not None:
+        large_context_mode = env_large_context.lower() in ("true", "1", "yes")
+    else:
+        large_context_mode = (mode == TranslationMode.GEMINI)
+
     if mode == TranslationMode.GEMINI:
         model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
-        normalised = _normalise_model_name(model)
-        if normalised == GEMINI_FLASH_MODEL_SUFFIX:
-            scene_threshold = float(
-                os.getenv("SCENE_THRESHOLD") or FLASH_SCENE_THRESHOLD
-            )
-            min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE)
-            max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE)
+        
+        # Only apply manual tuning if large_context_mode is NOT enabled
+        if not large_context_mode:
+            normalised = _normalise_model_name(model)
+            if normalised == GEMINI_FLASH_MODEL_SUFFIX:
+                scene_threshold = float(
+                    os.getenv("SCENE_THRESHOLD") or FLASH_SCENE_THRESHOLD
+                )
+                min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE)
+                max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE)
+            else:
+                scene_threshold = float(
+                    os.getenv("SCENE_THRESHOLD") or GEMINI_SCENE_THRESHOLD
+                )
+                min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE)
+                max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE)
         else:
-            scene_threshold = float(
-                os.getenv("SCENE_THRESHOLD") or GEMINI_SCENE_THRESHOLD
-            )
-            min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE)
-            max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE)
+            # If large context mode is on, let SubtitleBatcher handle defaults (or use env overrides)
+            if not os.getenv("SCENE_THRESHOLD"):
+                scene_threshold = 300.0
+            if not os.getenv("MAX_BATCH_SIZE"):
+                max_batch_size = 2000
+            if not os.getenv("MIN_BATCH_SIZE"):
+                min_batch_size = 1
+
         max_context_summaries = int(
             os.getenv("MAX_CONTEXT_SUMMARIES") or GEMINI_MAX_CONTEXT_SUMMARIES
         )
@@ -476,7 +499,10 @@ def translate_srt_file(
         "scene_threshold": scene_threshold,
         "min_batch_size": min_batch_size,
         "max_batch_size": max_batch_size,
+        "min_batch_size": min_batch_size,
+        "max_batch_size": max_batch_size,
         "max_context_summaries": max_context_summaries,
+        "large_context_mode": large_context_mode,
     }
     if rate_limit:
         settings["rate_limit"] = rate_limit
