@@ -61,7 +61,7 @@ else:
                     "model": settings.get_str('model') or os.getenv('GEMINI_MODEL'),
                     'stream_responses': settings.get_bool('stream_responses', os.getenv('GEMINI_STREAM_RESPONSES', "True") == "True"),
                     'enable_thinking': settings.get_bool('enable_thinking', os.getenv('GEMINI_ENABLE_THINKING', "False") == "True"),
-                    'thinking_budget': settings.get_int('thinking_budget', env_int('GEMINI_THINKING_BUDGET', 100)) or 100,
+                    'thinking_budget': settings.get_int('thinking_budget', env_int('GEMINI_THINKING_BUDGET', -1)) or -1,
                     'temperature': settings.get_float('temperature', env_float('GEMINI_TEMPERATURE', 0.0)),
                     'rate_limit': settings.get_float('rate_limit', env_float('GEMINI_RATE_LIMIT', 60.0)),
                     'use_vertex': settings.get_bool('use_vertex', os.getenv('GEMINI_USE_VERTEX', "False") == "True"),
@@ -128,7 +128,7 @@ else:
                             })
 
                             if self.settings.get_bool('enable_thinking', False):
-                                options['thinking_budget'] = (int, _("Token budget for reasoning. Higher values increase cost"))
+                                options['thinking_budget'] = (int, _("Token budget for reasoning. Set to -1 for dynamic budget (up to 8k tokens)"))
 
                         else:
                             options['model'] = (["Unable to retrieve models"], _("Check API key is authorized and try again"))

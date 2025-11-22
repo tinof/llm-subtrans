@@ -57,7 +57,7 @@ class GeminiClient(TranslationClient):
 
         # Configure reasoning parameters
         enable_thinking = settings.get_bool('enable_thinking', False)
-        thinking_budget = settings.get_int('thinking_budget', 100)
+        thinking_budget = settings.get_int('thinking_budget', -1)
         include_thoughts = False # Gemini appends thoughts to the text if this is true, breaking the parser
 
         self.thinking_config: ThinkingConfig|None = ThinkingConfig(
