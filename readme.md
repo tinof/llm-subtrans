@@ -414,7 +414,8 @@ Default values for many settings can be set in the .env file, using a NAME_IN_CA
   Maximum number of batches to process. To end the translation after a certain number of lines, e.g. to check the results.
 
 - `--temperature`:
-  A higher temperature increases the random variance of translations. Default 0.
+  A higher temperature increases the random variance of translations. Default 0.7.
+  Can also be set via environment variables: `LLM_TEMPERATURE` (global), or provider-specific `GEMINI_TEMPERATURE`, `OPENAI_TEMPERATURE`, `CLAUDE_TEMPERATURE`, `DEEPSEEK_TEMPERATURE`.
 
 - `--reload`:
   Subtitles will be reloaded from the source file rather than using the subtitles saved in the project (note: this implies `--project`)
