@@ -449,11 +449,27 @@ def translate_srt_file(
             if location:
                 settings_vertex["vertex_location"] = location
 
+    # Determine temperature
+    env_temp = os.getenv("LLM_TEMPERATURE")
+    if mode == TranslationMode.GEMINI:
+        env_temp = os.getenv("GEMINI_TEMPERATURE") or env_temp
+    elif mode == TranslationMode.CHATGPT:
+        env_temp = os.getenv("OPENAI_TEMPERATURE") or env_temp
+    elif mode == TranslationMode.CLAUDE:
+        env_temp = os.getenv("CLAUDE_TEMPERATURE") or env_temp
+    elif mode == TranslationMode.DEEPSEEK:
+        env_temp = os.getenv("DEEPSEEK_TEMPERATURE") or env_temp
+
+    try:
+        temperature = float(env_temp) if env_temp else 0.7
+    except ValueError:
+        temperature = 0.7
+
     # Build options
     settings = {
         "provider": provider,
         "target_language": target_language or MKVConfig().target_language,
-        "temperature": 0.2,
+        "temperature": temperature,
         "preprocess_subtitles": True,
         "postprocess_subtitles": True,
         "model": model,

@@ -720,11 +720,27 @@ def translate_subtitles(
                 rate_limit = None
         settings_vertex = {}
 
+    # Determine temperature
+    env_temp = os.getenv("LLM_TEMPERATURE")
+    if mode == TranslationMode.GEMINI:
+        env_temp = os.getenv("GEMINI_TEMPERATURE") or env_temp
+    elif mode == TranslationMode.CHATGPT:
+        env_temp = os.getenv("OPENAI_TEMPERATURE") or env_temp
+    elif mode == TranslationMode.CLAUDE:
+        env_temp = os.getenv("CLAUDE_TEMPERATURE") or env_temp
+    elif mode == TranslationMode.DEEPSEEK:
+        env_temp = os.getenv("DEEPSEEK_TEMPERATURE") or env_temp
+
+    try:
+        temperature = float(env_temp) if env_temp else 0.7
+    except ValueError:
+        temperature = 0.7
+
     # Create PySubtrans options
     settings = {
         "provider": provider,
         "target_language": config.target_language,
-        "temperature": 0.2,
+        "temperature": temperature,
         "preprocess_subtitles": True,
         "postprocess_subtitles": True,
         "model": model,
