@@ -510,6 +510,29 @@ def translate_srt_file(
 
     options = Options(settings)
 
+    # Display configuration information
+    effective_language = target_language or MKVConfig().target_language
+    lang_code = MKVConfig.get_language_code(effective_language)
+    
+    console.print(f"\n[bold cyan]Translation Configuration:[/bold cyan]")
+    console.print(f"  Provider: {provider}")
+    console.print(f"  Model: {model}")
+    console.print(f"  Target Language: {effective_language}")
+    console.print(f"  Temperature: {temperature}")
+    if rate_limit:
+        console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
+    
+    # Display instruction file info (if MKVConfig has one configured)
+    config = MKVConfig()
+    if config.instruction_file and config.instruction_file.exists():
+        console.print(f"  Instructions: {config.instruction_file}")
+    elif config.instruction_file:
+        console.print(f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]")
+    else:
+        console.print(f"  Instructions: [dim]None[/dim]")
+    
+    console.print()
+
     # Create project on the input file
     project = SubtitleProject(persistent=False)
     # Decide output path: replace existing language segment with target code
