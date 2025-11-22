@@ -45,15 +45,17 @@ FLASH_SCENE_THRESHOLD = 300.0
 FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
-LANGUAGE_SUFFIX_PATTERN = regex.compile(r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE)
+LANGUAGE_SUFFIX_PATTERN = regex.compile(
+    r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE
+)
 
 
-def _looks_like_language_suffix(suffix : str) -> bool:
+def _looks_like_language_suffix(suffix: str) -> bool:
     """Return True if suffix resembles a language identifier."""
     return bool(LANGUAGE_SUFFIX_PATTERN.match(suffix))
 
 
-def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path:
+def _build_translated_output_path(subtitle_file: Path, lang_code: str) -> Path:
     extension = subtitle_file.suffix or ".srt"
     filename = subtitle_file.name
     lang_code = lang_code.lower()
@@ -404,11 +406,11 @@ def translate_srt_file(
     if env_large_context is not None:
         large_context_mode = env_large_context.lower() in ("true", "1", "yes")
     else:
-        large_context_mode = (mode == TranslationMode.GEMINI)
+        large_context_mode = mode == TranslationMode.GEMINI
 
     if mode == TranslationMode.GEMINI:
         model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
-        
+
         # Only apply manual tuning if large_context_mode is NOT enabled
         if not large_context_mode:
             normalised = _normalise_model_name(model)
@@ -416,20 +418,28 @@ def translate_srt_file(
                 scene_threshold = float(
                     os.getenv("SCENE_THRESHOLD") or FLASH_SCENE_THRESHOLD
                 )
-                min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE)
-                max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE)
+                min_batch_size = int(
+                    os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE
+                )
+                max_batch_size = int(
+                    os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE
+                )
             else:
                 scene_threshold = float(
                     os.getenv("SCENE_THRESHOLD") or GEMINI_SCENE_THRESHOLD
                 )
-                min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE)
-                max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE)
+                min_batch_size = int(
+                    os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE
+                )
+                max_batch_size = int(
+                    os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE
+                )
         else:
             # If large context mode is on, let SubtitleBatcher handle defaults (or use env overrides)
             if not os.getenv("SCENE_THRESHOLD"):
                 scene_threshold = 300.0
             if not os.getenv("MAX_BATCH_SIZE"):
-                max_batch_size = 2000
+                max_batch_size = 600
             if not os.getenv("MIN_BATCH_SIZE"):
                 min_batch_size = 1
 
@@ -499,8 +509,6 @@ def translate_srt_file(
         "scene_threshold": scene_threshold,
         "min_batch_size": min_batch_size,
         "max_batch_size": max_batch_size,
-        "min_batch_size": min_batch_size,
-        "max_batch_size": max_batch_size,
         "max_context_summaries": max_context_summaries,
         "large_context_mode": large_context_mode,
     }
@@ -513,7 +521,7 @@ def translate_srt_file(
     # Display configuration information
     effective_language = target_language or MKVConfig().target_language
     lang_code = MKVConfig.get_language_code(effective_language)
-    
+
     console.print(f"\n[bold cyan]Translation Configuration:[/bold cyan]")
     console.print(f"  Provider: {provider}")
     console.print(f"  Model: {model}")
@@ -521,16 +529,18 @@ def translate_srt_file(
     console.print(f"  Temperature: {temperature}")
     if rate_limit:
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
-    
+
     # Display instruction file info (if MKVConfig has one configured)
     config = MKVConfig()
     if config.instruction_file and config.instruction_file.exists():
         console.print(f"  Instructions: {config.instruction_file}")
     elif config.instruction_file:
-        console.print(f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]")
+        console.print(
+            f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]"
+        )
     else:
         console.print(f"  Instructions: [dim]None[/dim]")
-    
+
     console.print()
 
     # Create project on the input file

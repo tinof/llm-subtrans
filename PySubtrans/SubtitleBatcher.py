@@ -9,7 +9,7 @@ class SubtitleBatcher:
         """ Initialize a SubtitleBatcher helper class with settings """
         self.large_context_mode : bool = settings.get_bool('large_context_mode', False)
         
-        default_max_batch = 2000 if self.large_context_mode else 100
+        default_max_batch = 600 if self.large_context_mode else 100
         default_scene_threshold = 300.0 if self.large_context_mode else 30.0
 
         self.min_batch_size : int = settings.get_int('min_batch_size') or 1

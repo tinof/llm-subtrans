@@ -56,15 +56,17 @@ FLASH_SCENE_THRESHOLD = 300.0
 FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
-LANGUAGE_SUFFIX_PATTERN = regex.compile(r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE)
+LANGUAGE_SUFFIX_PATTERN = regex.compile(
+    r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE
+)
 
 
-def _looks_like_language_suffix(suffix : str) -> bool:
+def _looks_like_language_suffix(suffix: str) -> bool:
     """Return True if suffix resembles a language identifier."""
     return bool(LANGUAGE_SUFFIX_PATTERN.match(suffix))
 
 
-def _build_translated_output_path(subtitle_file : Path, lang_code : str) -> Path:
+def _build_translated_output_path(subtitle_file: Path, lang_code: str) -> Path:
     """Generate output path replacing existing language suffix with target code."""
     extension = subtitle_file.suffix or ".srt"
     filename = subtitle_file.name
@@ -669,7 +671,7 @@ def translate_subtitles(
     if env_large_context is not None:
         large_context_mode = env_large_context.lower() in ("true", "1", "yes")
     else:
-        large_context_mode = (mode == TranslationMode.GEMINI)
+        large_context_mode = mode == TranslationMode.GEMINI
 
     if mode == TranslationMode.GEMINI:
         model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
@@ -682,23 +684,33 @@ def translate_subtitles(
                 scene_threshold = float(
                     os.getenv("SCENE_THRESHOLD") or FLASH_SCENE_THRESHOLD
                 )
-                min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE)
-                max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE)
+                min_batch_size = int(
+                    os.getenv("MIN_BATCH_SIZE") or FLASH_MIN_BATCH_SIZE
+                )
+                max_batch_size = int(
+                    os.getenv("MAX_BATCH_SIZE") or FLASH_MAX_BATCH_SIZE
+                )
             else:
                 scene_threshold = float(
                     os.getenv("SCENE_THRESHOLD") or GEMINI_SCENE_THRESHOLD
                 )
-                min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE)
-                max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE)
+                min_batch_size = int(
+                    os.getenv("MIN_BATCH_SIZE") or GEMINI_MIN_BATCH_SIZE
+                )
+                max_batch_size = int(
+                    os.getenv("MAX_BATCH_SIZE") or GEMINI_MAX_BATCH_SIZE
+                )
         else:
             # If large context mode is on, let SubtitleBatcher handle defaults (or use env overrides)
             # We just ensure we don't pass the small defaults
             if not os.getenv("SCENE_THRESHOLD"):
-                scene_threshold = 300.0 # Match SubtitleBatcher default for large context
+                scene_threshold = (
+                    300.0  # Match SubtitleBatcher default for large context
+                )
             if not os.getenv("MAX_BATCH_SIZE"):
-                max_batch_size = 2000 # Match SubtitleBatcher default for large context
+                max_batch_size = 600  # Match SubtitleBatcher default for large context
             if not os.getenv("MIN_BATCH_SIZE"):
-                min_batch_size = 1 # Let batcher decide or use small min
+                min_batch_size = 1  # Let batcher decide or use small min
 
         max_context_summaries = int(
             os.getenv("MAX_CONTEXT_SUMMARIES") or GEMINI_MAX_CONTEXT_SUMMARIES
@@ -766,8 +778,6 @@ def translate_subtitles(
         "scene_threshold": scene_threshold,
         "min_batch_size": min_batch_size,
         "max_batch_size": max_batch_size,
-        "min_batch_size": min_batch_size,
-        "max_batch_size": max_batch_size,
         "max_context_summaries": max_context_summaries,
         "large_context_mode": large_context_mode,
     }
@@ -791,15 +801,17 @@ def translate_subtitles(
     console.print(f"  Target Language: {config.target_language}")
     if rate_limit:
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
-    
+
     # Display instruction file info
     if config.instruction_file and config.instruction_file.exists():
         console.print(f"  Instructions: {config.instruction_file}")
     elif config.instruction_file:
-        console.print(f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]")
+        console.print(
+            f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]"
+        )
     else:
         console.print(f"  Instructions: [dim]None[/dim]")
-    
+
     console.print()
 
     # Create subtitle project
