@@ -6,6 +6,7 @@ import statistics
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -541,6 +542,7 @@ def process_video_file(
     interactive: bool,
     show_progress: bool,
     show_metrics: bool = True,
+    copy_local: bool = False,
 ):
     """Process a single video file - extract and translate subtitles"""
     logger.info(f"Processing {video_file}")
@@ -561,8 +563,48 @@ def process_video_file(
 
     # Extract subtitles if needed
     if not subtitle_file.exists():
-        if not extract_subtitles(video_file, subtitle_file, interactive, show_progress):
-            return
+        extraction_source = video_file
+        temp_file = None
+
+        if copy_local:
+            try:
+                # Create temp file
+                fd, temp_path = tempfile.mkstemp(suffix=".mkv")
+                os.close(fd)
+                temp_file = Path(temp_path)
+
+                # Get file size for progress
+                file_size = video_file.stat().st_size
+                size_gb = file_size / (1024 * 1024 * 1024)
+
+                console.print(
+                    f"[blue]Copying to local temp ({size_gb:.1f} GB):[/blue] {temp_file}"
+                )
+                start_copy = time.perf_counter()
+                shutil.copy2(video_file, temp_file)
+                copy_time = time.perf_counter() - start_copy
+                speed_mb = (file_size / (1024 * 1024)) / copy_time
+                console.print(
+                    f"[green]✓ Copied in {copy_time:.1f}s ({speed_mb:.1f} MB/s)[/green]"
+                )
+
+                extraction_source = temp_file
+
+            except Exception as e:
+                logger.error(f"Failed to copy to local temp: {e}")
+                if temp_file and temp_file.exists():
+                    temp_file.unlink()
+                return
+
+        try:
+            if not extract_subtitles(
+                extraction_source, subtitle_file, interactive, show_progress
+            ):
+                return
+        finally:
+            if temp_file and temp_file.exists():
+                temp_file.unlink()
+                console.print(f"[dim]Removed temp file: {temp_file}[/dim]")
 
     # Process subtitles: preprocess → filter → postprocess
     preprocess_timecodes(subtitle_file)
@@ -861,7 +903,11 @@ def translate_subtitles(
 
 
 def process_directory(
-    config: MKVConfig, mode: TranslationMode, interactive: bool, show_progress: bool
+    config: MKVConfig,
+    mode: TranslationMode,
+    interactive: bool,
+    show_progress: bool,
+    copy_local: bool = False,
 ):
     """Process all MKV files in the current directory"""
     # Get all MKV files and sort them
@@ -896,7 +942,12 @@ def process_directory(
             else:
                 console.print(f"[blue]⚙ Processing[/blue] {video_file.path.name}")
                 process_video_file(
-                    video_file.path, config, mode, interactive, show_progress
+                    video_file.path,
+                    config,
+                    mode,
+                    interactive,
+                    show_progress,
+                    copy_local=copy_local,
                 )
                 translated_file = _normalise_translated_output(
                     subtitle_file, translated_file, config.target_language, lang_code
@@ -989,6 +1040,11 @@ def main():
         action="store_true",
         help="Answer yes to prompts during --setup-vertex",
     )
+    parser.add_argument(
+        "--copy-local",
+        action="store_true",
+        help="Copy MKV file to local temporary directory before processing (useful for network mounts)",
+    )
     args = parser.parse_args()
 
     # Load environment variables
@@ -1043,10 +1099,13 @@ def main():
                         args.interactive,
                         show_progress,
                         show_metrics,
+                        copy_local=args.copy_local,
                     )
                 else:
                     # Process all MKV files in current directory
-                    process_directory(config, mode, args.interactive, show_progress)
+                    process_directory(
+                        config, mode, args.interactive, show_progress, args.copy_local
+                    )
 
                 return 0
 
