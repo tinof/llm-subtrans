@@ -136,21 +136,21 @@ def _normalise_translated_output(
     return desired_file
 
 
-def _sync_translated_subtitles(translated_file: Path) -> None:
-    """Run ssync on the translated subtitle file."""
+def _fix_finnish_subtitles(translated_file: Path) -> None:
+    """Run fix-finnish-subs on the translated subtitle file."""
     if not translated_file.exists():
-        logger.warning(
-            f"Cannot synchronise subtitles; {translated_file} does not exist"
-        )
+        logger.warning(f"Cannot fix subtitles; {translated_file} does not exist")
         return
 
     try:
-        subprocess.run(["ssync", str(translated_file)], check=True)
-        logger.info(f"Synchronised subtitles with ssync: {translated_file.name}")
+        subprocess.run(["fix-finnish-subs", str(translated_file)], check=True)
+        logger.info(f"Fixed subtitles with fix-finnish-subs: {translated_file.name}")
     except subprocess.CalledProcessError as exc:
-        logger.error(f"ssync failed for {translated_file}: {exc}")
+        logger.error(f"fix-finnish-subs failed for {translated_file}: {exc}")
     except Exception as exc:
-        logger.error(f"Unexpected error running ssync for {translated_file}: {exc}")
+        logger.error(
+            f"Unexpected error running fix-finnish-subs for {translated_file}: {exc}"
+        )
 
 
 class TranslationMetrics:
@@ -394,11 +394,11 @@ def _env_default_mode() -> TranslationMode | None:
 
 def verify_dependencies():
     """Verify required command line tools are available"""
-    required_commands = ["mkvextract", "mkvmerge"]
+    required_commands = ["ffmpeg", "ffprobe"]
     for cmd in required_commands:
         result = subprocess.run(["which", cmd], capture_output=True)
         if result.returncode != 0:
-            logger.error(f"{cmd} not found. Please install mkvtoolnix package.")
+            logger.error(f"{cmd} not found. Please install ffmpeg package.")
             sys.exit(1)
 
 
@@ -627,7 +627,7 @@ def process_video_file(
         )
 
         if translated_file.exists():
-            _sync_translated_subtitles(translated_file)
+            _fix_finnish_subtitles(translated_file)
 
             # Clean up the original extracted subtitle if translation succeeded
             if subtitle_file.exists():
@@ -641,7 +641,7 @@ def process_video_file(
 def extract_subtitles(
     video_file: Path, subtitle_file: Path, interactive: bool, show_progress: bool
 ) -> bool:
-    """Extract subtitles from MKV file using mkvextract"""
+    """Extract subtitles from MKV file using ffmpeg"""
     if not video_file.suffix.lower() == ".mkv":
         logger.error(f"Only MKV files are supported, got: {video_file.suffix}")
         return False
@@ -664,7 +664,7 @@ def extract_subtitles(
             logger.info("No subtitle track selected")
         else:
             logger.error(
-                f"No suitable subtitle track found in {video_file} (tried English and French)"
+                f"No suitable subtitle track found in {video_file} (checked preferred language tiers)"
             )
             logger.info("Available tracks:")
             for track in subtitle_tracks:
@@ -673,7 +673,7 @@ def extract_subtitles(
                 logger.info(f"  Track {track['id']}: {title} ({language})")
         return False
 
-    # Extract using mkvextract with progress bar
+    # Extract using ffmpeg
     return extract_track_with_progress(
         video_file, subtitle_file, selected_track["id"], show_progress, console
     )
@@ -837,7 +837,7 @@ def translate_subtitles(
     options = Options(settings)
 
     # Display model information
-    console.print(f"\n[bold cyan]Translation Configuration:[/bold cyan]")
+    console.print("\n[bold cyan]Translation Configuration:[/bold cyan]")
     console.print(f"  Provider: {provider}")
     console.print(f"  Model: {model}")
     console.print(f"  Target Language: {config.target_language}")
@@ -852,7 +852,7 @@ def translate_subtitles(
             f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]"
         )
     else:
-        console.print(f"  Instructions: [dim]None[/dim]")
+        console.print("  Instructions: [dim]None[/dim]")
 
     console.print()
 

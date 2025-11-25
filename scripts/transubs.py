@@ -117,19 +117,19 @@ def _normalise_translated_output(
     return desired_file
 
 
-def _sync_translated_subtitles(translated_file: Path) -> None:
+def _fix_finnish_subtitles(translated_file: Path) -> None:
     if not translated_file.exists():
-        logger.warning(
-            f"Cannot synchronise subtitles; {translated_file} does not exist"
-        )
+        logger.warning(f"Cannot fix subtitles; {translated_file} does not exist")
         return
     try:
-        subprocess.run(["ssync", str(translated_file)], check=True)
-        logger.info(f"Synchronised subtitles with ssync: {translated_file.name}")
+        subprocess.run(["fix-finnish-subs", str(translated_file)], check=True)
+        logger.info(f"Fixed subtitles with fix-finnish-subs: {translated_file.name}")
     except subprocess.CalledProcessError as exc:
-        logger.error(f"ssync failed for {translated_file}: {exc}")
+        logger.error(f"fix-finnish-subs failed for {translated_file}: {exc}")
     except Exception as exc:
-        logger.error(f"Unexpected error running ssync for {translated_file}: {exc}")
+        logger.error(
+            f"Unexpected error running fix-finnish-subs for {translated_file}: {exc}"
+        )
 
 
 class TranslationMetrics:
@@ -522,7 +522,7 @@ def translate_srt_file(
     effective_language = target_language or MKVConfig().target_language
     lang_code = MKVConfig.get_language_code(effective_language)
 
-    console.print(f"\n[bold cyan]Translation Configuration:[/bold cyan]")
+    console.print("\n[bold cyan]Translation Configuration:[/bold cyan]")
     console.print(f"  Provider: {provider}")
     console.print(f"  Model: {model}")
     console.print(f"  Target Language: {effective_language}")
@@ -539,7 +539,7 @@ def translate_srt_file(
             f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]"
         )
     else:
-        console.print(f"  Instructions: [dim]None[/dim]")
+        console.print("  Instructions: [dim]None[/dim]")
 
     console.print()
 
@@ -596,7 +596,7 @@ def translate_srt_file(
         sub_file, desired_path, target_language, lang_code
     )
     if normalised.exists():
-        _sync_translated_subtitles(normalised)
+        _fix_finnish_subtitles(normalised)
 
 
 def main() -> int:
