@@ -360,6 +360,7 @@ def translate_srt_file(
     provider_flag: str | None,
     show_progress: bool = True,
     show_metrics: bool = True,
+    proofread: bool = False,
 ) -> None:
     from PySubtrans.MKV.Config import (
         MODE_TO_DEFAULT_MODEL,
@@ -494,9 +495,9 @@ def translate_srt_file(
         env_temp = os.getenv("DEEPSEEK_TEMPERATURE") or env_temp
 
     try:
-        temperature = float(env_temp) if env_temp else 0.7
+        temperature = float(env_temp) if env_temp else 1.0
     except ValueError:
-        temperature = 0.7
+        temperature = 1.0
 
     # Build options
     settings = {
@@ -548,6 +549,22 @@ def translate_srt_file(
     # Decide output path: replace existing language segment with target code
     effective_language = target_language or MKVConfig().target_language
     lang_code = MKVConfig.get_language_code(effective_language)
+
+    if proofread:
+        # Locate the proofread instructions file
+        root_dir = Path(__file__).parent.parent
+        inst_file = root_dir / "instructions" / "instructions (proofread).txt"
+        if inst_file.exists():
+            settings["instruction_file"] = str(inst_file)
+            console.print(
+                f"  [green]Proofreading mode enabled[/green] (using {inst_file.name})"
+            )
+        else:
+            logger.warning(f"Proofread instructions not found at {inst_file}")
+
+        # Override output language code to 'proofread' to avoid overwriting original/translated files
+        lang_code = "proofread"
+
     desired_path = _build_translated_output_path(sub_file, lang_code)
     project.InitialiseProject(str(sub_file), str(desired_path))
     project.UpdateProjectSettings(options)
@@ -618,6 +635,11 @@ def main() -> int:
         "-l", "--language", help="Target language (default from config)"
     )
     parser.add_argument(
+        "--proofread",
+        action="store_true",
+        help="Proofread mode: fix flow and grammar without translating",
+    )
+    parser.add_argument(
         "--setup-vertex",
         action="store_true",
         help="Run Vertex setup assistant (delegates to exsubs --setup-vertex)",
@@ -677,8 +699,8 @@ def main() -> int:
             sub_path,
             args.language,
             provider_flag,
-            show_progress=not args.no_progress,
             show_metrics=not args.no_metrics,
+            proofread=args.proofread,
         )
         return 0
     except Exception as e:

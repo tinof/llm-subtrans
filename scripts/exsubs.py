@@ -805,9 +805,9 @@ def translate_subtitles(
         env_temp = os.getenv("DEEPSEEK_TEMPERATURE") or env_temp
 
     try:
-        temperature = float(env_temp) if env_temp else 0.7
+        temperature = float(env_temp) if env_temp else 1.0
     except ValueError:
-        temperature = 0.7
+        temperature = 1.0
 
     # Create PySubtrans options
     settings = {

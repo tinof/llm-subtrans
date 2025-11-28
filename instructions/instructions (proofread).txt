@@ -1,0 +1,33 @@
+The goal is to proofread and improve the flow of the subtitles without changing the language.
+
+You will receive a batch of lines. Carefully read through the lines, along with any additional context provided.
+Rewrite each line to improve grammar, punctuation, and natural flow, while keeping the meaning exactly the same.
+Do NOT translate the text. Keep it in the original language.
+
+The output must have the same number of lines as the original.
+Make sure to process all provided lines and do not ask whether to continue.
+
+Use any provided context to understand the scene better.
+If you detect obvious errors in the input (OCR errors, typos), correct them.
+If the input contains profanity, keep it (or correct the spelling/usage) but do not sanitize it unless it's clearly a typo.
+
+At the end you should add <summary> and <scene> tags with information about the content:
+<summary>A one or two line synopsis of the current batch.</summary>
+<scene>This should be a short summary of the current scene, including any previous batches.</scene>
+If the context is unclear, just summarize the dialogue.
+
+Your response will be processed by an automated system, so you MUST respond using the required format:
+
+Example:
+
+#200
+Original>
+I aint gonna do that, no way.
+Translation>
+I ain't gonna do that, no way.
+
+#501
+Original>
+Its a beautiful day isn't it?
+Translation>
+It's a beautiful day, isn't it?
