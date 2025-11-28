@@ -4,12 +4,15 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+
 class TranslationMode(str, Enum):
     """Supported translation modes"""
+
     CHATGPT = "chatgpt"
     CLAUDE = "claude"
     GEMINI = "gemini"
     DEEPSEEK = "deepseek"
+
 
 # Centralized mappings to reduce duplication
 MODE_TO_CMD = {
@@ -40,14 +43,24 @@ MODE_TO_RATE_LIMIT = {
     TranslationMode.DEEPSEEK: "4000",
 }
 
+
 @dataclass
 class MKVConfig:
     """Configuration for MKV subtitle extraction and translation"""
-    instruction_file : Path|None = None
-    target_language : str = "Finnish"
-    default_translation_mode : TranslationMode = TranslationMode.GEMINI
 
-    SUPPORTED_LANGUAGES = ["Finnish", "Greek", "German", "French", "Spanish", "Italian", "English"]
+    instruction_file: Path | None = None
+    target_language: str = "Finnish"
+    default_translation_mode: TranslationMode = TranslationMode.GEMINI
+
+    SUPPORTED_LANGUAGES = [
+        "Finnish",
+        "Greek",
+        "German",
+        "French",
+        "Spanish",
+        "Italian",
+        "English",
+    ]
 
     def __post_init__(self):
         """Initialize configurable paths from environment or defaults"""
@@ -55,15 +68,27 @@ class MKVConfig:
             return
 
         # Check environment variable first
-        env_path = os.getenv('LLMSUBTRANS_INSTRUCTION_FILE')
+        env_path = os.getenv("LLMSUBTRANS_INSTRUCTION_FILE")
         if env_path:
             self.instruction_file = Path(env_path)
             return
 
-        # Default to user's config directory and try to seed from packaged instructions
-        config_dir = Path.home() / '.config' / 'llm-subtrans'
+        # Check for instructions in the local repository 'instructions' folder first
+        # This allows running from source without installing to ~/.config
         lang_code = self.get_language_code(self.target_language)
-        default_path = config_dir / f'instructions_{lang_code}.txt'
+        repo_root = Path(__file__).parent.parent.parent
+        local_instruction_path = (
+            repo_root / "instructions" / f"instructions_{lang_code}.txt"
+        )
+
+        if local_instruction_path.exists():
+            self.instruction_file = local_instruction_path
+            return
+
+        # Default to user's config directory and try to seed from packaged instructions
+        config_dir = Path.home() / ".config" / "llm-subtrans"
+        lang_code = self.get_language_code(self.target_language)
+        default_path = config_dir / f"instructions_{lang_code}.txt"
 
         # Ensure directory exists
         try:
@@ -75,14 +100,14 @@ class MKVConfig:
         # Attempt to seed from packaged resource if not already present
         # Primary request: use the repository file 'instructions/instructions_fi.txt' as default
         try:
-            pkg = 'instructions'
-            resource_name = f'instructions_{lang_code}.txt'
+            pkg = "instructions"
+            resource_name = f"instructions_{lang_code}.txt"
             traversable = resources.files(pkg).joinpath(resource_name)
             if not default_path.exists() and traversable.is_file():
                 with resources.as_file(traversable) as src_path:
-                    content = Path(src_path).read_text(encoding='utf-8')
+                    content = Path(src_path).read_text(encoding="utf-8")
                     try:
-                        default_path.write_text(content, encoding='utf-8')
+                        default_path.write_text(content, encoding="utf-8")
                     except Exception:
                         # If writing fails, ignore and fall back to non-existent path
                         pass
@@ -93,7 +118,7 @@ class MKVConfig:
         self.instruction_file = default_path
 
     @staticmethod
-    def get_language_code(lang : str) -> str:
+    def get_language_code(lang: str) -> str:
         """Get ISO 639-1 language code from language name"""
         codes = {
             "Finnish": "fi",
@@ -107,7 +132,7 @@ class MKVConfig:
         return codes.get(lang, lang.lower()[:2])
 
     @staticmethod
-    def get_flag(lang : str) -> str:
+    def get_flag(lang: str) -> str:
         """Get emoji flag for language"""
         flags = {
             "Finnish": "🇫🇮",

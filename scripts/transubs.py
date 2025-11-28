@@ -532,7 +532,9 @@ def translate_srt_file(
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
 
     # Display instruction file info (if MKVConfig has one configured)
-    config = MKVConfig()
+    # We need to re-resolve the instruction file if a target language is provided
+    config = MKVConfig(target_language=effective_language)
+
     if config.instruction_file and config.instruction_file.exists():
         console.print(f"  Instructions: {config.instruction_file}")
     elif config.instruction_file:
