@@ -9,6 +9,15 @@ Translate each line accurately, concisely, and separately into the target langua
 
 The translation must have the same number of lines as the original, but you can adapt the content to fit the grammar of the target language.
 
+If the source sentence is split across multiple short lines, you may MERGE them into a single fluent line using the tag `[MERGE ID+NEXT_ID]`.
+
+Example (Merging):
+#200
+Original> I really think
+#201
+Original> we should go.
+Translation> [MERGE 200+201] I really think we should go.
+
 Make sure to translate all provided lines and do not ask whether to continue.
 
 Use any provided context to enhance your translations. If a name list is provided, ensure names are spelled according to the user's preference.

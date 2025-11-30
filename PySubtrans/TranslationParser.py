@@ -9,7 +9,11 @@ from PySubtrans.Helpers.Localization import _
 from PySubtrans.Helpers.SubtitleHelpers import MergeTranslations
 from PySubtrans.Helpers.Text import IsTextContentEqual
 from PySubtrans.SubtitleLine import SubtitleLine
-from PySubtrans.SubtitleError import NoTranslationError, TranslationError, UntranslatedLinesError
+from PySubtrans.SubtitleError import (
+    NoTranslationError,
+    TranslationError,
+    UntranslatedLinesError,
+)
 from PySubtrans.SubtitleValidator import SubtitleValidator
 from PySubtrans.Translation import Translation
 
@@ -27,47 +31,63 @@ fallback_patterns = [
     r"#(?P<number>\d+)(?:[\s\r\n]+Original[>:][\s\r\n]+(?P<original>[\s\S]*?))?[\s\r\n]*Translation[>:][\s\r\n]+(?P<body>[\s\S]*?)(?=(?:\n{2,}#)|\Z)",
     r"#(?P<number>\d+)(?:[\s\r\n]*Original[>:][\s\r\n]*(?P<original>[\s\S]*?))?[\s\r\n]*Translation[>:][\s\r\n]*(?P<body>[\s\S]*?)(?=(?:\n{2,}#)|\Z)",
     r"#(?P<number>\d+)[\s\r\n]+Translation[>:][\s\r\n]+(?P<body>[\s\S]*?)(?=(?:\n{2,}#)|\Z)",
-    r"#(?P<number>\d+)(?:[\s\r\n]+(?P<body>[\s\S]*?))?(?:(?=\n{2,})|\Z)"  # Just the number and translation
-    ]
+    r"#(?P<number>\d+)(?:[\s\r\n]+(?P<body>[\s\S]*?))?(?:(?=\n{2,})|\Z)",  # Just the number and translation
+]
+
 
 class TranslationParser:
     """
     Extract translated subtitles from the AI translation response
     """
-    def __init__(self, task_type : str, options : Options):
-        self.options : Options = options
-        self.text : str|None = None
-        self.translations : dict[int|str, SubtitleLine] = {}
-        self.translated : list[SubtitleLine] = []
-        self.errors : list[Exception] = []
-        self.warnings : list[str] = []
-        self.metatags : list[str] = ["summary", "scene"]
-        self.task_type : str = task_type
-        self.regex_patterns : list[regex.Pattern[Any]] = self.GetRegularExpressionPatterns(task_type)
 
-    def GetRegularExpressionPatterns(self, task_type : str = DEFAULT_TASK_TYPE) -> list[regex.Pattern[Any]]:
+    def __init__(self, task_type: str, options: Options):
+        self.options: Options = options
+        self.text: str | None = None
+        self.translations: dict[int | str, SubtitleLine] = {}
+        self.translated: list[SubtitleLine] = []
+        self.errors: list[Exception] = []
+        self.warnings: list[str] = []
+        self.metatags: list[str] = ["summary", "scene"]
+        self.task_type: str = task_type
+        self.regex_patterns: list[regex.Pattern[Any]] = (
+            self.GetRegularExpressionPatterns(task_type)
+        )
+
+    def GetRegularExpressionPatterns(
+        self, task_type: str = DEFAULT_TASK_TYPE
+    ) -> list[regex.Pattern[Any]]:
         """
         Returns a list of regular expressions to try for extracting translations
         """
         # Use the current default pattern, and fall back on alternative/older patterns if no matches are found
         patterns = [
             regex.compile(
-                pattern.replace(DEFAULT_TASK_TYPE, task_type), regex.MULTILINE) for pattern in [default_pattern] + fallback_patterns
-            ]
+                pattern.replace(DEFAULT_TASK_TYPE, task_type), regex.MULTILINE
+            )
+            for pattern in [default_pattern] + fallback_patterns
+        ]
         return patterns
 
-    def ProcessTranslation(self, translation : Translation, validate : bool = True) -> list[SubtitleLine]|None:
+    def ProcessTranslation(
+        self, translation: Translation, validate: bool = True
+    ) -> list[SubtitleLine] | None:
         """
         Extract lines from a batched translation, using the
         pre-defined pattern to match each line, or a list of fallbacks
         if the match fails.
         """
-        self.text = translation.text if isinstance(translation, Translation) else str(translation)
+        self.text = (
+            translation.text
+            if isinstance(translation, Translation)
+            else str(translation)
+        )
 
         if not self.text:
-            raise TranslationError("No translated text provided", translation=translation)
+            raise TranslationError(
+                "No translated text provided", translation=translation
+            )
 
-        matches : list[dict[str,str]] = []
+        matches: list[dict[str, str]] = []
 
         for template in self.regex_patterns:
             matches = self.FindMatches(f"{self.text}\n\n", template)
@@ -76,19 +96,22 @@ class TranslationParser:
                 break
 
         if not matches:
-            raise TranslationError(f"No matches found in translation text using patterns: {self.regex_patterns}", translation=translation)
+            raise TranslationError(
+                f"No matches found in translation text using patterns: {self.regex_patterns}",
+                translation=translation,
+            )
 
         logging.debug(f"Matches: {str(matches)}")
 
         subs = [SubtitleLine(match) for match in matches]
-        self.translations = {
-            sub.key: sub for sub in subs
-            }
+        self.translations = {sub.key: sub for sub in subs}
 
         if not self.translations:
             return None
 
-        self.translated = MergeTranslations(self.translated, list(self.translations.values()))
+        self.translated = MergeTranslations(
+            self.translated, list(self.translations.values())
+        )
 
         if validate:
             self.errors = self.ValidateTranslations()
@@ -99,19 +122,24 @@ class TranslationParser:
 
         return self.translated
 
-    def FindMatches(self, text, template) -> list[dict[str,str]]:
+    def FindMatches(self, text, template) -> list[dict[str, str]]:
         """
         re.findall has some very unhelpful behaviour, so we use finditer instead.
         """
-        return [{
-            'body': match.group('body'),
-            'number': match.groupdict().get('number'),
-            'start': match.groupdict().get('start'),
-            'end': match.groupdict().get('end'),
-            'original': match.groupdict().get('original')
-            } for match in template.finditer(text)]
+        return [
+            {
+                "body": match.group("body"),
+                "number": match.groupdict().get("number"),
+                "start": match.groupdict().get("start"),
+                "end": match.groupdict().get("end"),
+                "original": match.groupdict().get("original"),
+            }
+            for match in template.finditer(text)
+        ]
 
-    def MatchTranslations(self, originals : list[SubtitleLine]) -> tuple[list[SubtitleLine], list[SubtitleLine]]:
+    def MatchTranslations(
+        self, originals: list[SubtitleLine]
+    ) -> tuple[list[SubtitleLine], list[SubtitleLine]]:
         """
         Match lines in the translation with the original subtitles
         """
@@ -120,16 +148,58 @@ class TranslationParser:
 
         matched = []
         unmatched = []
+        merged_ids = set()
+
+        # Create a map for quick lookup of original lines
+        original_map = {line.number: line for line in originals}
 
         for item in originals:
-            translation : SubtitleLine|None = self.translations.get(item.key)
+            # Skip if this line was part of a merge
+            if item.number in merged_ids:
+                continue
+
+            translation: SubtitleLine | None = self.translations.get(item.key)
+
             if translation:
+                # Check for MERGE tag
+                # Format: [MERGE startID+endID]
+                merge_match = regex.match(
+                    r"^\[MERGE\s+(?P<start>\d+)\+(?P<end>\d+)\]\s*(?P<text>.*)",
+                    translation.text,
+                    regex.DOTALL,
+                )
+
+                if merge_match:
+                    start_id = int(merge_match.group("start"))
+                    end_id = int(merge_match.group("end"))
+                    translation_text = merge_match.group("text")
+
+                    if start_id == item.number and end_id in original_map:
+                        # Calculate new end time
+                        end_line = original_map[end_id]
+                        translation.end = end_line.end
+                        translation.text = translation_text
+
+                        # Mark intermediate lines as merged
+                        # We assume sequential IDs for now, but we should probably handle gaps if possible
+                        # For now, let's just mark the specific end_id and any IDs in between if they exist in the map
+                        for i in range(start_id + 1, end_id + 1):
+                            if i in original_map:
+                                merged_ids.add(i)
+                                # Optionally mark the original line as having a "merged" translation for debugging
+                                original_map[i].translation = "[MERGED]"
+
                 translation.number = item.number
                 translation.start = item.start or timedelta(seconds=0)
-                translation.end = item.end or timedelta(seconds=0)
+                # If it wasn't a merge, end time is just item.end. If it was a merge, we already updated it.
+                if not merge_match:
+                    translation.end = item.end or timedelta(seconds=0)
+
                 translation.metadata = item.metadata
 
-                if translation.original and IsTextContentEqual(translation.text, item.text):
+                if translation.original and IsTextContentEqual(
+                    translation.text, item.text
+                ):
                     # Check for swapped original & translation
                     translation.text = translation.original
                     translation.original = item.text
@@ -145,15 +215,19 @@ class TranslationParser:
             self.TryFuzzyMatches(unmatched)
 
         if unmatched:
-            self.errors.append(UntranslatedLinesError(f"No translation found for {len(unmatched)} lines", lines=unmatched))
+            self.errors.append(
+                UntranslatedLinesError(
+                    f"No translation found for {len(unmatched)} lines", lines=unmatched
+                )
+            )
 
         return matched, unmatched
 
-    def TryFuzzyMatches(self, unmatched : list [SubtitleLine]) -> None:
+    def TryFuzzyMatches(self, unmatched: list[SubtitleLine]) -> None:
         """
         Try to match translations to their source lines using heuristics
         """
-        possible_matches : list[tuple[SubtitleLine,SubtitleLine]] = []
+        possible_matches: list[tuple[SubtitleLine, SubtitleLine]] = []
         for item in (item for item in unmatched if item.number is not None):
             for translation in self.translations.values():
                 if translation.original:
@@ -168,20 +242,27 @@ class TranslationParser:
                         possible_matches.append((item, translation))
                         continue
 
-                    #TODO: check for merged lines
-
         if possible_matches:
             for item, translation in possible_matches:
-                self.warnings.append(_("Found fuzzy match for line {number} in translations").format(number=item.number))
+                self.warnings.append(
+                    _("Found fuzzy match for line {number} in translations").format(
+                        number=item.number
+                    )
+                )
                 item.translation = f"#Fuzzy: {translation.text}"
-                #unmatched.remove(item)
+                # unmatched.remove(item)
 
     def ValidateTranslations(self) -> list[Exception]:
         """
         Check if the translation seems at least plausible
         """
         if not self.translated:
-            return [ NoTranslationError("Failed to extract translations from response", translation=self.text) ]
+            return [
+                NoTranslationError(
+                    "Failed to extract translations from response",
+                    translation=self.text,
+                )
+            ]
 
         validator = SubtitleValidator(self.options)
         return validator.ValidateTranslations(self.translated)
@@ -190,7 +271,7 @@ class TranslationParser:
         """
         Check if the last line of the translation picked up a summary without a closing tag
         """
-        last_line : SubtitleLine = self.translated[-1]
+        last_line: SubtitleLine = self.translated[-1]
 
         if not last_line.text:
             return
@@ -201,7 +282,8 @@ class TranslationParser:
         for match in re_opening.finditer(last_line.text):
             tag = match.group(1)
             if not regex.search(rf"</{tag}>", last_line.text):
-                self.warnings.append(_("Found unclosed tag {tag} in translation").format(tag=tag))
-                last_line.text = last_line.text[:match.start()]
+                self.warnings.append(
+                    _("Found unclosed tag {tag} in translation").format(tag=tag)
+                )
+                last_line.text = last_line.text[: match.start()]
                 break
-            

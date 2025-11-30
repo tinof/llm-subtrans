@@ -1,20 +1,73 @@
-docs/
-instructions/
-locales/
-scripts/
-tests/
-.aiexclude
-.gitignore
-install.sh
-LICENSE
-pyproject.toml
-readme.md
+# ===========================================
+# ai-digest ignore file for llm-subtrans
+# ===========================================
+
+# Virtual environment (huge, not useful for understanding code)
 envsubtrans/
-.ruff_cache/
-.github/
-.claude/
+
+# Build artifacts
+build/
+dist/
 llm_subtrans.egg-info/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test output and data
 test_results/
+testfiles/
+tests/TestData/*.mkv
+
+# Sample files in root
+*.srt
+*.ass
+*.ssa
+*.vtt
+
+# Compiled locale files (binary)
+*.mo
+
+# Environment and secrets
+.env
+.env.*
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Package manager
+*.egg
+*.egg-info/
+
+# Logs
+*.log
+
+# Duplicate licenses (keep root only)
+PySubtrans/LICENSE
+
+# Install script (simple bash, not core logic)
+install.sh
+
+# Distribution scripts (build tooling, not core logic)
+scripts/makedistro*.sh
+scripts/generate-cmd.sh
+scripts/publish_package.py
+scripts/verify_package.py
+scripts/sync_version.py
+
+# AI agent instruction files (meta, not code)
 AGENTS.md
 CLAUDE.md
 GEMINI.md
