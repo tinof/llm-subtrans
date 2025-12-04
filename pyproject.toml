@@ -58,3 +58,7 @@ namespaces = true
 
 [tool.setuptools.package-data]
 instructions = ["*.txt"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
