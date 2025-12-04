@@ -24,7 +24,9 @@ dependencies = [
     "subtitle_filter",
     "chardet",
     "filelock",
-    "rich"
+    "rich",
+    "ffmpeg-progress-yield",
+    "tqdm"
 ]
 
 [project.optional-dependencies]
