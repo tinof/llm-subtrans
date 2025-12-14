@@ -1060,7 +1060,6 @@ def main():
         return setup_vertex(yes=args.yes)
 
     # Initialize config
-    config = MKVConfig()
     if args.language:
         if args.language not in MKVConfig.SUPPORTED_LANGUAGES:
             logger.error(f"Unsupported language: {args.language}")
@@ -1068,7 +1067,9 @@ def main():
                 f"Supported languages: {', '.join(MKVConfig.SUPPORTED_LANGUAGES)}"
             )
             sys.exit(1)
-        config.target_language = args.language
+        config = MKVConfig(target_language=args.language)
+    else:
+        config = MKVConfig()
 
     # Determine translation mode
     env_mode = _env_default_mode()
