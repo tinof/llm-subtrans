@@ -19,32 +19,36 @@ from PySubtrans.SubtitleSerialisation import SubtitleDecoder, SubtitleEncoder
 from PySubtrans.SubtitleTranslator import SubtitleTranslator
 from PySubtrans.TranslationEvents import TranslationEvents
 
-default_encoding = os.getenv('DEFAULT_ENCODING', 'utf-8')
+default_encoding = os.getenv("DEFAULT_ENCODING", "utf-8")
+
 
 class SubtitleProject:
     """
     Handles loading, saving and creation of project files for LLM-Subtrans
     """
-    DEFAULT_PROJECT_SETTINGS : SettingsType = SettingsType({
-        'provider': None,
-        'model': None,
-        'target_language': None,
-        'prompt': None,
-        'task_type': None,
-        'instructions': None,
-        'retry_instructions': None,
-        'movie_name': None,
-        'description': None,
-        'names': None,
-        'substitutions': None,
-        'substitution_mode': None,
-        'include_original': None,
-        'add_right_to_left_markers': None,
-        'instruction_file': None,
-        'format': None
-    })
-   
-    def __init__(self, persistent : bool = False):
+
+    DEFAULT_PROJECT_SETTINGS: SettingsType = SettingsType(
+        {
+            "provider": None,
+            "model": None,
+            "target_language": None,
+            "prompt": None,
+            "task_type": None,
+            "instructions": None,
+            "retry_instructions": None,
+            "movie_name": None,
+            "description": None,
+            "names": None,
+            "substitutions": None,
+            "substitution_mode": None,
+            "include_original": None,
+            "add_right_to_left_markers": None,
+            "instruction_file": None,
+            "format": None,
+        }
+    )
+
+    def __init__(self, persistent: bool = False):
         """
         A subtitle translation project.
 
@@ -53,30 +57,34 @@ class SubtitleProject:
 
         :param persistent: if True, the project will be saved to disk and automatically reloaded next time
         """
-        self.subtitles : Subtitles = Subtitles(settings=self.DEFAULT_PROJECT_SETTINGS)
+        self.subtitles: Subtitles = Subtitles(settings=self.DEFAULT_PROJECT_SETTINGS)
         self.events = TranslationEvents()
-        self.projectfile : str|None = None
-        self.existing_project : bool = False
-        self.needs_writing : bool = False
+        self.projectfile: str | None = None
+        self.existing_project: bool = False
+        self.needs_writing: bool = False
         self.lock = threading.RLock()
 
         # By default the project is not persistent, i.e. it will not be saved to a file and automatically reloaded next time
-        self.use_project_file : bool = persistent
+        self.use_project_file: bool = persistent
 
         # By default the translated subtitles will be written to file
         self.write_translation = True
 
     @property
-    def target_language(self) -> str|None:
-        return self.subtitles.settings.get_str('target_language') if self.subtitles else None
-    
-    @property
-    def task_type(self) -> str|None:
-        return self.subtitles.settings.get_str('task_type') if self.subtitles else None
+    def target_language(self) -> str | None:
+        return (
+            self.subtitles.settings.get_str("target_language")
+            if self.subtitles
+            else None
+        )
 
     @property
-    def movie_name(self) -> str|None:
-        return self.subtitles.settings.get_str('movie_name') if self.subtitles else None
+    def task_type(self) -> str | None:
+        return self.subtitles.settings.get_str("task_type") if self.subtitles else None
+
+    @property
+    def movie_name(self) -> str | None:
+        return self.subtitles.settings.get_str("movie_name") if self.subtitles else None
 
     @property
     def any_translated(self) -> bool:
@@ -89,18 +97,23 @@ class SubtitleProject:
             return bool(self.subtitles and self.subtitles.all_translated)
 
     @target_language.setter
-    def target_language(self, value : str|None) -> None:
-        self._set_project_setting('target_language', value)
+    def target_language(self, value: str | None) -> None:
+        self._set_project_setting("target_language", value)
 
     @task_type.setter
-    def task_type(self, value : str|None) -> None:
-        self._set_project_setting('task_type', value)
+    def task_type(self, value: str | None) -> None:
+        self._set_project_setting("task_type", value)
 
     @movie_name.setter
-    def movie_name(self, value : str|None) -> None:
-        self._set_project_setting('movie_name', value)
+    def movie_name(self, value: str | None) -> None:
+        self._set_project_setting("movie_name", value)
 
-    def InitialiseProject(self, filepath : str, outputpath : str|None = None, reload_subtitles : bool = False):
+    def InitialiseProject(
+        self,
+        filepath: str,
+        outputpath: str | None = None,
+        reload_subtitles: bool = False,
+    ):
         """
         Initialize the project by either loading an existing project file or creating a new one.
         Load the subtitles to be translated, either from the project file or the source file.
@@ -110,24 +123,28 @@ class SubtitleProject:
         :param reload_subtitles: force reloading subtitles from source file
         """
         filepath = os.path.normpath(filepath)
-        sourcepath : str = filepath
+        sourcepath: str = filepath
         self.projectfile = self.GetProjectFilepath(filepath or "subtitles")
 
-        project_file_exists : bool = os.path.exists(self.projectfile)
-        project_settings : SettingsType = SettingsType()
+        project_file_exists: bool = os.path.exists(self.projectfile)
+        project_settings: SettingsType = SettingsType()
 
         # If initialised with a project file, we are implicitly using a project file
         if filepath == self.projectfile:
             self.use_project_file = True
 
-        read_project : bool = self.use_project_file and project_file_exists
-        load_subtitles : bool = reload_subtitles or not read_project
+        read_project: bool = self.use_project_file and project_file_exists
+        load_subtitles: bool = reload_subtitles or not read_project
 
         if not read_project and not load_subtitles:
             raise SubtitleError(_("No project or subtitles to load"))
 
         if project_file_exists and not read_project:
-            logging.warning(_("Project file {} exists but will not be used").format(self.projectfile))
+            logging.warning(
+                _("Project file {} exists but will not be used").format(
+                    self.projectfile
+                )
+            )
 
         if read_project:
             logging.info(_("Loading existing project file {}").format(self.projectfile))
@@ -135,12 +152,16 @@ class SubtitleProject:
             self.ReadProjectFile(self.projectfile)
             project_settings = self.GetProjectSettings()
 
-            subtitles : Subtitles = self.subtitles
+            subtitles: Subtitles = self.subtitles
             if subtitles:
                 self.UpdateOutputPath()
 
-                outputpath = outputpath or GetOutputPath(self.projectfile, self.target_language, subtitles.file_format)
-                sourcepath = subtitles.sourcepath if subtitles.sourcepath else sourcepath               
+                outputpath = outputpath or GetOutputPath(
+                    self.projectfile, self.target_language, subtitles.file_format
+                )
+                sourcepath = (
+                    subtitles.sourcepath if subtitles.sourcepath else sourcepath
+                )
                 logging.info(_("Project file loaded"))
 
                 if subtitles.scenes:
@@ -160,7 +181,9 @@ class SubtitleProject:
                 self.LoadSubtitleFile(sourcepath)
 
             except Exception as e:
-                logging.error(_("Failed to load subtitle file {}: {}").format(filepath, str(e)))
+                logging.error(
+                    _("Failed to load subtitle file {}: {}").format(filepath, str(e))
+                )
                 raise
 
         subtitles = self.subtitles
@@ -170,7 +193,9 @@ class SubtitleProject:
 
         if outputpath:
             subtitles.outputpath = outputpath
-            subtitles.file_format = SubtitleFormatRegistry.get_format_from_filename(outputpath)
+            subtitles.file_format = SubtitleFormatRegistry.get_format_from_filename(
+                outputpath
+            )
             self.needs_writing = self.use_project_file
 
         # Re-apply any project settings and update for compatibility
@@ -192,35 +217,52 @@ class SubtitleProject:
             self._update_compatibility(settings)
 
             # Filter settings to only include known project settings
-            filtered_settings = SettingsType({key: settings[key] for key in settings if key in self.DEFAULT_PROJECT_SETTINGS})
+            filtered_settings = SettingsType(
+                {
+                    key: settings[key]
+                    for key in settings
+                    if key in self.DEFAULT_PROJECT_SETTINGS
+                }
+            )
 
             # Process names and substitutions into standard formats
-            if 'names' in filtered_settings:
-                names_list = filtered_settings.get('names', [])
-                filtered_settings['names'] = ParseNames(names_list)
+            if "names" in filtered_settings:
+                names_list = filtered_settings.get("names", [])
+                filtered_settings["names"] = ParseNames(names_list)
 
-            if 'substitutions' in filtered_settings:
-                substitutions_list = filtered_settings.get('substitutions', [])
+            if "substitutions" in filtered_settings:
+                substitutions_list = filtered_settings.get("substitutions", [])
                 if substitutions_list:
-                    filtered_settings['substitutions'] = Substitutions.Parse(substitutions_list)
+                    filtered_settings["substitutions"] = Substitutions.Parse(
+                        substitutions_list
+                    )
 
             # Check if there are any actual changes
             common_keys = filtered_settings.keys() & self.subtitles.settings.keys()
             new_keys = filtered_settings.keys() - self.subtitles.settings.keys()
 
-            if new_keys or not all(filtered_settings.get(key) == self.subtitles.settings.get(key) for key in common_keys):
+            if new_keys or not all(
+                filtered_settings.get(key) == self.subtitles.settings.get(key)
+                for key in common_keys
+            ):
                 self.subtitles.UpdateSettings(filtered_settings)
-                self.needs_writing = self.use_project_file and bool(self.subtitles.scenes)
+                self.needs_writing = self.use_project_file and bool(
+                    self.subtitles.scenes
+                )
 
-    def UpdateOutputPath(self, path: str|None = None, extension: str|None = None) -> None:
+    def UpdateOutputPath(
+        self, path: str | None = None, extension: str | None = None
+    ) -> None:
         """
         Set or generate the output path for the translated subtitles
         """
         path = path or self.subtitles.sourcepath
         extension = extension or self.subtitles.file_format
         if not extension:
-            extension = SubtitleFormatRegistry.get_format_from_filename(path) if path else None
-            extension = extension or '.srt'
+            extension = (
+                SubtitleFormatRegistry.get_format_from_filename(path) if path else None
+            )
+            extension = extension or ".srt"
 
         if extension == ".subtrans":
             raise SubtitleError("Cannot use .subtrans as output format")
@@ -229,19 +271,21 @@ class SubtitleProject:
         self.subtitles.outputpath = outputpath
         self.subtitles.file_format = extension
 
-    def SaveOriginal(self, outputpath : str|None = None):
+    def SaveOriginal(self, outputpath: str | None = None):
         """
         Write the original subtitles to a file
         """
         try:
             with self.lock:
-                outputpath = outputpath or GetOutputPath(self.subtitles.sourcepath, None, self.subtitles.file_format)
+                outputpath = outputpath or GetOutputPath(
+                    self.subtitles.sourcepath, None, self.subtitles.file_format
+                )
                 self.subtitles.SaveOriginal(outputpath)
 
         except Exception as e:
             logging.error(_("Unable to save original subtitles: {}").format(e))
 
-    def SaveTranslation(self, outputpath : str|None = None):
+    def SaveTranslation(self, outputpath: str | None = None):
         """
         Write output file
         """
@@ -266,15 +310,15 @@ class SubtitleProject:
 
         return SubtitleEditor(self.subtitles, mark_project_dirty)
 
-    def GetProjectFilepath(self, filepath : str) -> str:
+    def GetProjectFilepath(self, filepath: str) -> str:
         """
         Calculate the project file path based on the source file path
         """
         path, ext = os.path.splitext(filepath)
-        filepath = filepath if ext == '.subtrans' else f"{path}.subtrans"
+        filepath = filepath if ext == ".subtrans" else f"{path}.subtrans"
         return os.path.normpath(filepath)
 
-    def GetBackupFilepath(self, filepath : str) -> str:
+    def GetBackupFilepath(self, filepath: str) -> str:
         """
         Get the backup file path for the project file
         """
@@ -312,7 +356,7 @@ class SubtitleProject:
             if self.needs_writing and self.subtitles and self.subtitles.scenes:
                 self.SaveProjectFile()
 
-    def SaveProjectFile(self, projectfile : str|None = None) -> None:
+    def SaveProjectFile(self, projectfile: str | None = None) -> None:
         """
         Write a set of subtitles to a project file
         """
@@ -347,7 +391,7 @@ class SubtitleProject:
                 backupfile = self.GetBackupFilepath(self.projectfile)
                 self.WriteProjectToFile(backupfile, encoder_class=SubtitleEncoder)
 
-    def ReadProjectFile(self, filepath : str|None = None) -> Subtitles|None:
+    def ReadProjectFile(self, filepath: str | None = None) -> Subtitles | None:
         """
         Load scenes, subtitles and context from a project file
         """
@@ -359,7 +403,7 @@ class SubtitleProject:
             with self.lock:
                 logging.info(_("Reading project data from {}").format(str(filepath)))
 
-                with open(filepath, 'r', encoding=default_encoding, newline='') as f:
+                with open(filepath, "r", encoding=default_encoding, newline="") as f:
                     self.subtitles: Subtitles = json.load(f, cls=SubtitleDecoder)
 
                 with SubtitleEditor(self.subtitles) as editor:
@@ -382,9 +426,17 @@ class SubtitleProject:
         if not self.subtitles:
             return SettingsType()
 
-        return SettingsType({ key : value for key, value in self.subtitles.settings.items() if value is not None and (value != '' or isinstance(value, list)) })
+        return SettingsType(
+            {
+                key: value
+                for key, value in self.subtitles.settings.items()
+                if value is not None and (value != "" or isinstance(value, list))
+            }
+        )
 
-    def WriteProjectToFile(self, projectfile: str, encoder_class: type|None = None) -> None:
+    def WriteProjectToFile(
+        self, projectfile: str, encoder_class: type | None = None
+    ) -> None:
         """
         Save the project settings to a JSON file
         """
@@ -395,11 +447,13 @@ class SubtitleProject:
         logging.info(_("Writing project data to {}").format(str(projectfile)))
 
         with self.lock:
-            with open(projectfile, 'w', encoding=default_encoding) as f:
-                project_json = json.dumps(self.subtitles, cls=encoder_class, ensure_ascii=False, indent=4) # type: ignore
+            with open(projectfile, "w", encoding=default_encoding) as f:
+                project_json = json.dumps(
+                    self.subtitles, cls=encoder_class, ensure_ascii=False, indent=4
+                )  # type: ignore
                 f.write(project_json)
 
-    def TranslateSubtitles(self, translator : SubtitleTranslator) -> None:
+    def TranslateSubtitles(self, translator: SubtitleTranslator) -> None:
         """
         One-stop shop: Use *translator* to translate a project, then save the translation.
         """
@@ -412,7 +466,7 @@ class SubtitleProject:
         # Prime new project files
         self.UpdateProjectFile()
 
-        save_translation : bool = self.write_translation and not translator.preview
+        save_translation: bool = self.write_translation and not translator.preview
 
         translator.events.preprocessed.connect(self._on_preprocessed)
         translator.events.batch_translated.connect(self._on_batch_translated)
@@ -442,7 +496,13 @@ class SubtitleProject:
             translator.events.scene_translated.disconnect(self._on_scene_translated)
             translator.events.disconnect_default_loggers()
 
-    def TranslateScene(self, translator : SubtitleTranslator, scene_number : int, batch_numbers : list[int]|None = None, line_numbers : list[int]|None = None) -> SubtitleScene|None:
+    def TranslateScene(
+        self,
+        translator: SubtitleTranslator,
+        scene_number: int,
+        batch_numbers: list[int] | None = None,
+        line_numbers: list[int] | None = None,
+    ) -> SubtitleScene | None:
         """
         Pass batches of subtitles to *translator* for translation.
         """
@@ -457,11 +517,16 @@ class SubtitleProject:
         translator.events.connect_default_loggers()
 
         try:
-            scene : SubtitleScene = self.subtitles.GetScene(scene_number)
+            scene: SubtitleScene = self.subtitles.GetScene(scene_number)
 
             scene.errors = []
 
-            translator.TranslateScene(self.subtitles, scene, batch_numbers=batch_numbers, line_numbers=line_numbers)
+            translator.TranslateScene(
+                self.subtitles,
+                scene,
+                batch_numbers=batch_numbers,
+                line_numbers=line_numbers,
+            )
 
             return scene
 
@@ -479,7 +544,11 @@ class SubtitleProject:
         """
         with self.lock:
             if not self.subtitles:
-                raise SubtitleError(_("Cannot set {setting_name}, no subtitles loaded").format(setting_name=setting_name))
+                raise SubtitleError(
+                    _("Cannot set {setting_name}, no subtitles loaded").format(
+                        setting_name=setting_name
+                    )
+                )
 
             if self.subtitles.settings.get_str(setting_name) != value:
                 self.subtitles.settings[setting_name] = value
@@ -489,26 +558,27 @@ class SubtitleProject:
         """
         Update settings for compatibility with older versions
         """
-        if not settings.get('description') and settings.get('synopsis'):
-            settings['description'] = settings.get('synopsis')
+        if not settings.get("description") and settings.get("synopsis"):
+            settings["description"] = settings.get("synopsis")
 
-        if settings.get('characters'):
-            names = settings.get_str_list('names')
-            names.extend(settings.get_str_list('characters'))
-            settings['names'] = names
-            del settings['characters']
+        if settings.get("characters"):
+            names = settings.get_str_list("names")
+            names.extend(settings.get_str_list("characters"))
+            settings["names"] = names
+            del settings["characters"]
 
-        if settings.get('gpt_prompt'):
-            settings['prompt'] = settings['gpt_prompt']
-            del settings['gpt_prompt']
+        if settings.get("gpt_prompt"):
+            settings["prompt"] = settings["gpt_prompt"]
+            del settings["gpt_prompt"]
 
-        if settings.get('gpt_model'):
-            settings['model'] = settings['gpt_model']
-            del settings['gpt_model']
+        if settings.get("gpt_model"):
+            settings["model"] = settings["gpt_model"]
+            del settings["gpt_model"]
 
-        if not settings.get('substitution_mode'):
-            settings['substitution_mode'] = "Partial Words" if settings.get('match_partial_words') else "Auto"
-
+        if not settings.get("substitution_mode"):
+            settings["substitution_mode"] = (
+                "Partial Words" if settings.get("match_partial_words") else "Auto"
+            )
 
     def _on_preprocessed(self, sender, scenes) -> None:
         logging.debug("Pre-processing finished")
@@ -523,5 +593,3 @@ class SubtitleProject:
         logging.debug("Scene translated")
         self.needs_writing = self.use_project_file
         self.events.scene_translated.send(self, scene=scene)
-
-

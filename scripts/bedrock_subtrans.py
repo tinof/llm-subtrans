@@ -12,26 +12,41 @@ from PySubtrans import init_translator
 from PySubtrans.Options import Options
 from PySubtrans.SubtitleProject import SubtitleProject
 
+
 def main() -> int:
     """Main entry point for bedrock-subtrans command"""
-    check_required_imports(['PySubtrans', 'boto3'], 'bedrock')
+    check_required_imports(["PySubtrans", "boto3"], "bedrock")
 
     # Provider configuration
     provider = "Bedrock"
 
     # Fetch Bedrock-specific environment variables
-    access_key = os.getenv('AWS_ACCESS_KEY_ID')
-    secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-    aws_region = os.getenv('AWS_REGION', 'us-east-1')  # Default to a common Bedrock region
+    access_key = os.getenv("AWS_ACCESS_KEY_ID")
+    secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    aws_region = os.getenv(
+        "AWS_REGION", "us-east-1"
+    )  # Default to a common Bedrock region
 
-    parser = CreateArgParser(f"Translates subtitles using a model on Amazon Bedrock")
-    parser.add_argument('-k', '--accesskey', type=str, default=None, help="AWS Access Key ID")
-    parser.add_argument('-s', '--secretkey', type=str, default=None, help="AWS Secret Access Key")
-    parser.add_argument('-r', '--region', type=str, default=None, help="AWS Region (default: us-east-1)")
-    parser.add_argument('-m', '--model', type=str, default=None, help="Model ID to use (e.g., amazon.titan-text-express-v1)")
+    parser = CreateArgParser("Translates subtitles using a model on Amazon Bedrock")
+    parser.add_argument(
+        "-k", "--accesskey", type=str, default=None, help="AWS Access Key ID"
+    )
+    parser.add_argument(
+        "-s", "--secretkey", type=str, default=None, help="AWS Secret Access Key"
+    )
+    parser.add_argument(
+        "-r", "--region", type=str, default=None, help="AWS Region (default: us-east-1)"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default=None,
+        help="Model ID to use (e.g., amazon.titan-text-express-v1)",
+    )
     args = parser.parse_args()
 
-    logger_options = InitLogger("bedrock-subtrans", args.debug)
+    InitLogger("bedrock-subtrans", args.debug)
 
     try:
         options: Options = CreateOptions(
@@ -44,8 +59,15 @@ def main() -> int:
         )
 
         # Validate that required Bedrock options are provided
-        if not options.get('access_key') or not options.get('secret_access_key') or not options.get('aws_region') or not options.get('model'):
-            raise ValueError("AWS Access Key, Secret Key, Region, and Model ID must be specified.")
+        if (
+            not options.get("access_key")
+            or not options.get("secret_access_key")
+            or not options.get("aws_region")
+            or not options.get("model")
+        ):
+            raise ValueError(
+                "AWS Access Key, Secret Key, Region, and Model ID must be specified."
+            )
 
         # Create a project for the translation
         project: SubtitleProject = CreateProject(options, args)
@@ -64,5 +86,6 @@ def main() -> int:
         logging.error(f"Error during subtitle translation: {e}")
         return 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     raise SystemExit(main())

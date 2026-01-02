@@ -12,30 +12,40 @@ from PySubtrans import init_translator
 from PySubtrans.Options import Options
 from PySubtrans.SubtitleProject import SubtitleProject
 
+
 def main() -> int:
     """Main entry point for azure-subtrans command"""
-    check_required_imports(['PySubtrans', 'openai'], 'azure')
+    check_required_imports(["PySubtrans", "openai"], "azure")
 
     # Update when newer ones are available - https://learn.microsoft.com/en-us/azure/ai-services/openai/reference
-    latest_azure_api_version = "2024-02-01"
 
     # Provider configuration
     provider = "Azure"
-    deployment_name = os.getenv('AZURE_DEPLOYMENT_NAME')
-    api_base = os.getenv('AZURE_API_BASE')
-    api_version = os.getenv('AZURE_API_VERSION', "2024-02-01")
+    deployment_name = os.getenv("AZURE_DEPLOYMENT_NAME")
+    api_base = os.getenv("AZURE_API_BASE")
+    api_version = os.getenv("AZURE_API_VERSION", "2024-02-01")
 
-    parser = CreateArgParser(f"Translates subtitles using a model on an OpenAI Azure deployment")
-    parser.add_argument('-k', '--apikey', type=str, default=None, help=f"API key for your deployment")
-    parser.add_argument('-b', '--apibase', type=str, default=None, help="API backend base address.")
-    parser.add_argument('-a', '--apiversion', type=str, default=None, help="Azure API version")
-    parser.add_argument('--deploymentname', type=str, default=None, help="Azure deployment name")
+    parser = CreateArgParser(
+        "Translates subtitles using a model on an OpenAI Azure deployment"
+    )
+    parser.add_argument(
+        "-k", "--apikey", type=str, default=None, help="API key for your deployment"
+    )
+    parser.add_argument(
+        "-b", "--apibase", type=str, default=None, help="API backend base address."
+    )
+    parser.add_argument(
+        "-a", "--apiversion", type=str, default=None, help="Azure API version"
+    )
+    parser.add_argument(
+        "--deploymentname", type=str, default=None, help="Azure deployment name"
+    )
     args = parser.parse_args()
 
-    logger_options = InitLogger("azure-subtrans", args.debug)
+    InitLogger("azure-subtrans", args.debug)
 
     try:
-        options : Options = CreateOptions(
+        options: Options = CreateOptions(
             args,
             provider,
             deployment_name=args.deploymentname or deployment_name,
@@ -44,7 +54,7 @@ def main() -> int:
         )
 
         # Create a project for the translation
-        project : SubtitleProject = CreateProject(options, args)
+        project: SubtitleProject = CreateProject(options, args)
 
         # Translate the subtitles
         translator = init_translator(options)
@@ -60,5 +70,6 @@ def main() -> int:
         print("Error:", e)
         return 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     raise SystemExit(main())

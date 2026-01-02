@@ -14,11 +14,12 @@ timestamp_patterns = [
     r"^(?P<seconds>\d{1,2})(?:,(?P<milliseconds>\d{3}))?$",
 ]
 
-re_timestamps = [
-    regex.compile(pattern) for pattern in timestamp_patterns
-]
+re_timestamps = [regex.compile(pattern) for pattern in timestamp_patterns]
 
-def GetTimeDelta(time : datetime.timedelta|str|int|float|None, raise_exception : bool = False) -> datetime.timedelta|Exception|None:
+
+def GetTimeDelta(
+    time: datetime.timedelta | str | int | float | None, raise_exception: bool = False
+) -> datetime.timedelta | Exception | None:
     """
     Ensure the input value is a timedelta, as best we can
     """
@@ -36,12 +37,22 @@ def GetTimeDelta(time : datetime.timedelta|str|int|float|None, raise_exception :
     for pattern in re_timestamps:
         time_match = pattern.match(timestamp)
         if time_match:
-            hours = int(time_match.group("hours")) if "hours" in time_match.groupdict() else 0
-            minutes = int(time_match.group("minutes")) if "minutes" in time_match.groupdict() else 0
+            hours = (
+                int(time_match.group("hours"))
+                if "hours" in time_match.groupdict()
+                else 0
+            )
+            minutes = (
+                int(time_match.group("minutes"))
+                if "minutes" in time_match.groupdict()
+                else 0
+            )
             seconds = int(time_match.group("seconds") or 0)
             milliseconds = int(time_match.group("milliseconds") or 0)
 
-            return datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds, milliseconds=milliseconds)
+            return datetime.timedelta(
+                hours=hours, minutes=minutes, seconds=seconds, milliseconds=milliseconds
+            )
 
     error = ValueError(f"Invalid time format: {time}")
     if raise_exception:
@@ -49,7 +60,10 @@ def GetTimeDelta(time : datetime.timedelta|str|int|float|None, raise_exception :
 
     return error
 
-def GetTimeDeltaSafe(time : datetime.timedelta|str|int|float|None) -> datetime.timedelta|None:
+
+def GetTimeDeltaSafe(
+    time: datetime.timedelta | str | int | float | None,
+) -> datetime.timedelta | None:
     """
     Ensure the input value is a timedelta, raising an exception if it cannot be parsed.
     """
@@ -59,7 +73,10 @@ def GetTimeDeltaSafe(time : datetime.timedelta|str|int|float|None) -> datetime.t
     else:
         return timedelta
 
-def TimedeltaToText(time: datetime.timedelta|None, include_milliseconds : bool = True) -> str:
+
+def TimedeltaToText(
+    time: datetime.timedelta | None, include_milliseconds: bool = True
+) -> str:
     """
     Convert a timedelta to a minimal string representation, adhering to specific formatting rules:
     - Hours, minutes, and seconds may appear with leading zeros only as required.
@@ -92,14 +109,19 @@ def TimedeltaToText(time: datetime.timedelta|None, include_milliseconds : bool =
 
     return time_str
 
-def TimedeltaToSrtTimestamp(time: datetime.timedelta|str|None) -> str|None:
+
+def TimedeltaToSrtTimestamp(time: datetime.timedelta | str | None) -> str | None:
     """
     Convert a timedelta to a string suitable for SRT timestamps.
     """
     if time is None:
         return None
 
-    tdelta : datetime.timedelta|Exception|None = time if isinstance(time, datetime.timedelta) else GetTimeDelta(time, raise_exception=True)
+    tdelta: datetime.timedelta | Exception | None = (
+        time
+        if isinstance(time, datetime.timedelta)
+        else GetTimeDelta(time, raise_exception=True)
+    )
 
     if not isinstance(tdelta, datetime.timedelta):
         raise ValueError(f"Invalid timedelta: {time}")
@@ -111,5 +133,3 @@ def TimedeltaToSrtTimestamp(time: datetime.timedelta|str|None) -> str|None:
     minutes, seconds = divmod(remainder, 60)
 
     return f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
-
-

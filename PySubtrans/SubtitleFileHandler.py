@@ -5,8 +5,8 @@ import os
 from PySubtrans.SubtitleData import SubtitleData
 
 # Default encodings for reading subtitle files
-default_encoding = os.getenv('DEFAULT_ENCODING', 'utf-8')
-fallback_encoding = os.getenv('FALLBACK_ENCODING', 'iso-8859-1')
+default_encoding = os.getenv("DEFAULT_ENCODING", "utf-8")
+fallback_encoding = os.getenv("FALLBACK_ENCODING", "iso-8859-1")
 
 
 class SubtitleFileHandler(ABC):
@@ -28,7 +28,7 @@ class SubtitleFileHandler(ABC):
 
         Raises:
             SubtitleParseError: If parsing fails
-        
+
         """
         raise NotImplementedError
 
@@ -68,7 +68,7 @@ class SubtitleFileHandler(ABC):
 
         Raises:
             SubtitleParseError: If parsing fails
-            UnicodeDecodeError: If file is in an unsupported encoding            
+            UnicodeDecodeError: If file is in an unsupported encoding
         """
         raise NotImplementedError
 

@@ -1,7 +1,8 @@
 import sys
 import importlib.util
 
-def check_required_imports(modules: list[str], pip_extras: str|None = None) -> None:
+
+def check_required_imports(modules: list[str], pip_extras: str | None = None) -> None:
     """Check if required modules are available and exit with helpful message if not"""
     missing_modules = []
     for module_name in modules:

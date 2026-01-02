@@ -1,23 +1,25 @@
 import regex as re
 from pathlib import Path
 
+
 class VideoFile:
     """
     Represents a video file with season/episode parsing for sorting
     """
+
     # Pre-compile regex for better performance
     _SEASON_EPISODE_PATTERN = re.compile(
         r"[Ss](\d{1,2})[Ee](\d{1,2})|(\d{1,2})x(\d{1,2})|(\d{1,2})\.(\d{1,2})"
     )
 
-    def __init__(self, path : Path):
+    def __init__(self, path: Path):
         self.path = path
         season, episode = self._parse_season_episode(path.name)
         self.season = season
         self.episode = episode
 
     @classmethod
-    def _parse_season_episode(cls, filename : str) -> tuple[int, int]:
+    def _parse_season_episode(cls, filename: str) -> tuple[int, int]:
         """Parse season and episode from filename using compiled regex"""
         match = cls._SEASON_EPISODE_PATTERN.search(filename)
         if match:

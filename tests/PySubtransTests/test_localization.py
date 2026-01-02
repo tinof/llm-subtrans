@@ -10,6 +10,7 @@ from PySubtrans.Helpers.Localization import (
     get_locale_display_name,
 )
 
+
 class TestLocalization(LoggedTestCase):
     def test_initialize_default_english(self):
         initialize_localization("en")
@@ -19,7 +20,12 @@ class TestLocalization(LoggedTestCase):
 
         # tr() should match _() when no context-specific entry exists
         ctx_result = tr("dialog", text)
-        self.assertLoggedEqual("context translation matches", text, ctx_result, input_value=("dialog", text))
+        self.assertLoggedEqual(
+            "context translation matches",
+            text,
+            ctx_result,
+            input_value=("dialog", text),
+        )
 
     def test_switch_to_spanish_and_back(self):
         # Switch to Spanish and verify a commonly-translated label
@@ -29,7 +35,12 @@ class TestLocalization(LoggedTestCase):
 
         # tr() should also use the active language
         es_ctx_result = tr("menu", "Cancel")
-        self.assertLoggedEqual("spanish context translation", "Cancelar", es_ctx_result, input_value=("menu", "Cancel"))
+        self.assertLoggedEqual(
+            "spanish context translation",
+            "Cancelar",
+            es_ctx_result,
+            input_value=("menu", "Cancel"),
+        )
 
         # Now switch back to English
         set_language("en")
@@ -56,7 +67,12 @@ class TestLocalization(LoggedTestCase):
             input_value=(msgid, "{file}=ABC.srt"),
         )
         # Ensure placeholder survived translation and formats correctly
-        self.assertLoggedEqual("formatted first word", "Ejecutando", formatted.split()[0], input_value=formatted)
+        self.assertLoggedEqual(
+            "formatted first word",
+            "Ejecutando",
+            formatted.split()[0],
+            input_value=formatted,
+        )
         self.assertIn("ABC.srt", formatted)
 
     def test_available_locales_and_display_name(self):
@@ -76,5 +92,5 @@ class TestLocalization(LoggedTestCase):
         self.assertGreater(len(name), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

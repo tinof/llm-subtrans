@@ -13,27 +13,43 @@ from PySubtrans import init_translator
 from PySubtrans.Options import Options
 from PySubtrans.SubtitleProject import SubtitleProject
 
+
 def main() -> int:
     """Main entry point for claude-subtrans command"""
-    check_required_imports(['PySubtrans', 'anthropic'], 'claude')
+    check_required_imports(["PySubtrans", "anthropic"], "claude")
 
     # Provider configuration
     provider = "Claude"
-    default_model = os.getenv('CLAUDE_MODEL') or "claude-3-haiku-20240307"
+    default_model = os.getenv("CLAUDE_MODEL") or "claude-3-haiku-20240307"
 
-    parser = CreateArgParser(f"Translates subtitles using Anthropic's Claude AI")
-    parser.add_argument('-k', '--apikey', type=str, default=None, help=f"Your Anthropic API Key (https://console.anthropic.com/settings/keys)")
-    parser.add_argument('-m', '--model', type=str, default=None, help="The model to use for translation")
-    parser.add_argument('--proxy', type=str, default=None, help="SOCKS proxy URL (e.g., socks://127.0.0.1:1089)")
+    parser = CreateArgParser("Translates subtitles using Anthropic's Claude AI")
+    parser.add_argument(
+        "-k",
+        "--apikey",
+        type=str,
+        default=None,
+        help="Your Anthropic API Key (https://console.anthropic.com/settings/keys)",
+    )
+    parser.add_argument(
+        "-m", "--model", type=str, default=None, help="The model to use for translation"
+    )
+    parser.add_argument(
+        "--proxy",
+        type=str,
+        default=None,
+        help="SOCKS proxy URL (e.g., socks://127.0.0.1:1089)",
+    )
     args = parser.parse_args()
 
-    logger_options = InitLogger("claude-subtrans", args.debug)
+    InitLogger("claude-subtrans", args.debug)
 
     try:
-        options : Options = CreateOptions(args, provider, model=args.model or default_model, proxy=args.proxy)
+        options: Options = CreateOptions(
+            args, provider, model=args.model or default_model, proxy=args.proxy
+        )
 
         # Create a project for the translation
-        project : SubtitleProject = CreateProject(options, args)
+        project: SubtitleProject = CreateProject(options, args)
 
         # Translate the subtitles
         translator = init_translator(options)
@@ -49,5 +65,6 @@ def main() -> int:
         print("Error:", e)
         return 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     raise SystemExit(main())

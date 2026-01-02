@@ -13,32 +13,46 @@ from PySubtrans import init_translator
 from PySubtrans.Options import Options
 from PySubtrans.SubtitleProject import SubtitleProject
 
+
 def main() -> int:
     """Main entry point for mistral-subtrans command"""
-    check_required_imports(['PySubtrans', 'mistralai'], 'mistral')
+    check_required_imports(["PySubtrans", "mistralai"], "mistral")
 
     # Provider configuration
     provider = "Mistral"
-    default_model = os.getenv('MISTRAL_MODEL') or "open-mistral-nemo"
+    default_model = os.getenv("MISTRAL_MODEL") or "open-mistral-nemo"
 
-    parser = CreateArgParser(f"Translates subtitles using an Mistral model")
-    parser.add_argument('-k', '--apikey', type=str, default=None, help=f"Your Mistral API Key (https://console.mistral.ai/api-keys/)")
-    parser.add_argument('-m', '--model', type=str, default=None, help="The model to use for translation")
-    parser.add_argument('--server_url', type=str, default=None, help="Server URL (leave blank for default).")
+    parser = CreateArgParser("Translates subtitles using an Mistral model")
+    parser.add_argument(
+        "-k",
+        "--apikey",
+        type=str,
+        default=None,
+        help="Your Mistral API Key (https://console.mistral.ai/api-keys/)",
+    )
+    parser.add_argument(
+        "-m", "--model", type=str, default=None, help="The model to use for translation"
+    )
+    parser.add_argument(
+        "--server_url",
+        type=str,
+        default=None,
+        help="Server URL (leave blank for default).",
+    )
     args = parser.parse_args()
 
-    logger_options = InitLogger("mistral-subtrans", args.debug)
+    InitLogger("mistral-subtrans", args.debug)
 
     try:
-        options : Options = CreateOptions(
+        options: Options = CreateOptions(
             args,
             provider,
             server_url=args.server_url,
-            model=args.model or default_model
+            model=args.model or default_model,
         )
 
         # Create a project for the translation
-        project : SubtitleProject = CreateProject(options, args)
+        project: SubtitleProject = CreateProject(options, args)
 
         # Translate the subtitles
         translator = init_translator(options)
@@ -54,5 +68,6 @@ def main() -> int:
         print("Error:", e)
         return 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     raise SystemExit(main())

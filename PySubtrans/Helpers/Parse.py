@@ -3,7 +3,8 @@ import regex
 import json
 import logging
 
-def ParseNames(name_list : str|list|None|Any) -> list[str]:
+
+def ParseNames(name_list: str | list | None | Any) -> list[str]:
     """
     Parse a list of names from a string or list of strings
     """
@@ -15,11 +16,17 @@ def ParseNames(name_list : str|list|None|Any) -> list[str]:
 
     if isinstance(name_list, list):
         # Split each string in the list by comma or newline
-        return [name.strip() for name in name_list for name in regex.split(r"[\n,]\s*", name) if name.strip()]
+        return [
+            name.strip()
+            for name in name_list
+            for name in regex.split(r"[\n,]\s*", name)
+            if name.strip()
+        ]
 
     return []
 
-def ParseDelayFromHeader(value : str) -> float:
+
+def ParseDelayFromHeader(value: str) -> float:
     """
     Try to figure out how long a suggested retry-after is
     """
@@ -33,12 +40,12 @@ def ParseDelayFromHeader(value : str) -> float:
     try:
         delay, unit = match.groups()
         delay = float(delay)
-        unit = unit.lower() if unit else 's'
-        if unit == 's':
+        unit = unit.lower() if unit else "s"
+        if unit == "s":
             pass
-        elif unit == 'm':
+        elif unit == "m":
             delay *= 60
-        elif unit == 'ms':
+        elif unit == "ms":
             delay /= 1000
         else:
             logging.error(f"Unexpected time unit '{unit}'")
@@ -50,7 +57,8 @@ def ParseDelayFromHeader(value : str) -> float:
         logging.error(f"Unexpected time value '{value}' ({e})")
         return 6.66
 
-def ParseErrorMessageFromText(value: str) -> str|None:
+
+def ParseErrorMessageFromText(value: str) -> str | None:
     """
     Try to extract a human-friendly error message from an HTTP response body.
 
@@ -68,7 +76,9 @@ def ParseErrorMessageFromText(value: str) -> str|None:
         text = value.strip()
 
         # If wrapped in single or double quotes, strip them
-        if (text.startswith("'") and text.endswith("'")) or (text.startswith('"') and text.endswith('"')):
+        if (text.startswith("'") and text.endswith("'")) or (
+            text.startswith('"') and text.endswith('"')
+        ):
             text = text[1:-1]
 
         # Try direct JSON parse first
@@ -77,30 +87,30 @@ def ParseErrorMessageFromText(value: str) -> str|None:
         except json.JSONDecodeError:
             data = None
             # Fallback: try to locate an embedded JSON object
-            brace_start = text.find('{')
-            brace_end = text.rfind('}')
+            brace_start = text.find("{")
+            brace_end = text.rfind("}")
             if brace_start != -1 and brace_end > brace_start:
                 try:
-                    data = json.loads(text[brace_start:brace_end + 1])
+                    data = json.loads(text[brace_start : brace_end + 1])
                 except json.JSONDecodeError:
                     pass  # data remains None
 
         # If JSON parsed, try common locations for an error message
         if isinstance(data, dict):
             # Common: {"error": {"message": "..."}}
-            err = data.get('error')
+            err = data.get("error")
             if isinstance(err, dict):
-                msg = err.get('message')
+                msg = err.get("message")
                 if isinstance(msg, str) and msg.strip():
                     return msg.strip()
                 # Some providers may use 'Error' or different casing
-                for key in ('Message', 'msg', 'description', 'detail', 'error_message'):
+                for key in ("Message", "msg", "description", "detail", "error_message"):
                     val = err.get(key)
                     if isinstance(val, str) and val.strip():
                         return val.strip()
 
             # Sometimes the message is at top-level
-            for key in ('message', 'error_message', 'detail', 'description'):
+            for key in ("message", "error_message", "detail", "description"):
                 val = data.get(key)
                 if isinstance(val, str) and val.strip():
                     return val.strip()
@@ -120,4 +130,3 @@ def ParseErrorMessageFromText(value: str) -> str|None:
     except Exception as e:
         logging.debug(f"ParseErrorMessageFromText failed: {e}")
         return None
-

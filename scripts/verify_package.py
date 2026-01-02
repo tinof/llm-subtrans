@@ -12,11 +12,19 @@ import tempfile
 import shutil
 from pathlib import Path
 
-def run_command(cmd : list[str], cwd : str|None = None, capture_output : bool = True, env : dict|None = None) -> subprocess.CompletedProcess:
+
+def run_command(
+    cmd: list[str],
+    cwd: str | None = None,
+    capture_output: bool = True,
+    env: dict | None = None,
+) -> subprocess.CompletedProcess:
     """Run a command and return the result"""
     print(f"Running: {' '.join(cmd)}")
     try:
-        result = subprocess.run(cmd, cwd=cwd, capture_output=capture_output, text=True, check=False, env=env)
+        result = subprocess.run(
+            cmd, cwd=cwd, capture_output=capture_output, text=True, check=False, env=env
+        )
         if result.returncode != 0:
             print(f"Command failed with return code {result.returncode}")
             if capture_output:
@@ -27,6 +35,7 @@ def run_command(cmd : list[str], cwd : str|None = None, capture_output : bool = 
         print(f"Error running command: {e}")
         raise
 
+
 def get_project_version() -> str:
     """Get the version from PySubtrans/version.py"""
     script_dir = Path(__file__).parent
@@ -35,18 +44,20 @@ def get_project_version() -> str:
     if not version_file.exists():
         raise FileNotFoundError(f"Version file not found: {version_file}")
 
-    with open(version_file, 'r') as f:
+    with open(version_file, "r") as f:
         content = f.read()
 
     # Extract version from __version__ = "vX.Y.Z" format
     import re
+
     match = re.search(r'__version__\s*=\s*["\']v?([^"\']+)["\']', content)
     if not match:
         raise ValueError(f"Could not parse version from {version_file}")
 
     return match.group(1)
 
-def run_unit_tests(venv_python : str):
+
+def run_unit_tests(venv_python: str):
     """Run the unit tests from the project's tests/unit_tests.py using the clean venv"""
     print("Running unit tests from project...")
 
@@ -61,18 +72,25 @@ def run_unit_tests(venv_python : str):
 
     # Create clean environment to ensure we use the installed package
     env = os.environ.copy()
-    if 'PYTHONPATH' in env:
-        del env['PYTHONPATH']  # Remove local development path
+    if "PYTHONPATH" in env:
+        del env["PYTHONPATH"]  # Remove local development path
 
     # Run the unit tests using the clean virtual environment's python
     # Use a temp directory as working directory to avoid path conflicts
     import tempfile
+
     temp_run_dir = tempfile.mkdtemp()
 
     print(f"Running: {venv_python} {unit_tests_script}")
-    result = run_command([venv_python, str(unit_tests_script)], capture_output=False, env=env, cwd=temp_run_dir)
+    result = run_command(
+        [venv_python, str(unit_tests_script)],
+        capture_output=False,
+        env=env,
+        cwd=temp_run_dir,
+    )
 
     return result.returncode == 0
+
 
 def create_test_script() -> str:
     """Create a temporary test script to run in the virtual environment"""
@@ -110,6 +128,7 @@ if __name__ == "__main__":
         sys.exit(1)
 '''
     return test_script
+
 
 def main():
     """Main verification function"""
@@ -170,9 +189,9 @@ def main():
 
         # Parse version from pip show output
         installed_version = None
-        for line in result.stdout.split('\n'):
-            if line.startswith('Version:'):
-                installed_version = line.split(':')[1].strip()
+        for line in result.stdout.split("\n"):
+            if line.startswith("Version:"):
+                installed_version = line.split(":")[1].strip()
                 break
 
         if not installed_version:
@@ -183,7 +202,7 @@ def main():
 
         # Compare versions
         if installed_version != expected_version:
-            print(f"VERSION MISMATCH!")
+            print("VERSION MISMATCH!")
             print(f"Expected: {expected_version}")
             print(f"Installed: {installed_version}")
             return 1
@@ -192,7 +211,7 @@ def main():
 
         # Create and run test script for basic import verification
         print("\nCreating test script...")
-        with open(test_script_path, 'w') as f:
+        with open(test_script_path, "w") as f:
             f.write(create_test_script())
 
         print("\nRunning import verification...")
@@ -213,35 +232,48 @@ def main():
             # Find the installed PySubtrans package location in the venv
             # Make sure we're looking in the venv, not the local development version
             env = os.environ.copy()
-            if 'PYTHONPATH' in env:
-                del env['PYTHONPATH']  # Remove local development path
+            if "PYTHONPATH" in env:
+                del env["PYTHONPATH"]  # Remove local development path
 
-            result = run_command([venv_python, "-c", "import sys; import PySubtrans; import os; print(os.path.dirname(os.path.dirname(PySubtrans.__file__)))"],
-                                cwd=temp_dir, env=env)
+            result = run_command(
+                [
+                    venv_python,
+                    "-c",
+                    "import sys; import PySubtrans; import os; print(os.path.dirname(os.path.dirname(PySubtrans.__file__)))",
+                ],
+                cwd=temp_dir,
+                env=env,
+            )
             if result.returncode == 0:
                 site_packages_dir = result.stdout.strip()
                 target_tests_root = os.path.join(site_packages_dir, "tests")
                 target_tests = os.path.join(target_tests_root, "PySubtransTests")
                 target_testdata = os.path.join(target_tests_root, "TestData")
 
-                print(f"Creating tests directory structure in site-packages")
+                print("Creating tests directory structure in site-packages")
                 print(f"Copying {source_tests} to {target_tests}")
                 print(f"Copying {source_testdata} to {target_testdata}")
                 try:
                     # Create tests directory and copy with proper structure
                     os.makedirs(target_tests_root, exist_ok=True)
-                    shutil.copytree(source_tests, target_tests,
-                                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+                    shutil.copytree(
+                        source_tests,
+                        target_tests,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                    )
                     if source_testdata.exists():
-                        shutil.copytree(source_testdata, target_testdata,
-                                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+                        shutil.copytree(
+                            source_testdata,
+                            target_testdata,
+                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                        )
 
                     # Create __init__.py files to make it a proper package
-                    with open(os.path.join(target_tests_root, "__init__.py"), 'w') as f:
+                    with open(os.path.join(target_tests_root, "__init__.py"), "w") as f:
                         f.write("# Test package\n")
-                    with open(os.path.join(target_tests, "__init__.py"), 'w') as f:
+                    with open(os.path.join(target_tests, "__init__.py"), "w") as f:
                         f.write("# PySubtrans tests\n")
-                    with open(os.path.join(target_testdata, "__init__.py"), 'w') as f:
+                    with open(os.path.join(target_testdata, "__init__.py"), "w") as f:
                         f.write("# Test data\n")
 
                 except Exception as e:
@@ -257,7 +289,7 @@ def main():
         # Run the copied unit tests directly
         print("\nRunning unit tests...")
         print("Creating simple test runner...")
-        test_runner_script = f'''
+        test_runner_script = '''
 import unittest
 import sys
 import os
@@ -317,16 +349,21 @@ if __name__ == "__main__":
 '''
 
         runner_script_path = os.path.join(temp_dir, "run_tests.py")
-        with open(runner_script_path, 'w') as f:
+        with open(runner_script_path, "w") as f:
             f.write(test_runner_script)
 
         # Run the test runner in clean environment
         env = os.environ.copy()
-        if 'PYTHONPATH' in env:
-            del env['PYTHONPATH']
+        if "PYTHONPATH" in env:
+            del env["PYTHONPATH"]
 
         print("Running copied unit tests...")
-        result = run_command([venv_python, runner_script_path], capture_output=False, env=env, cwd=temp_dir)
+        result = run_command(
+            [venv_python, runner_script_path],
+            capture_output=False,
+            env=env,
+            cwd=temp_dir,
+        )
         tests_passed = result.returncode == 0
 
         if tests_passed:
@@ -340,6 +377,7 @@ if __name__ == "__main__":
             print("Package verification failed!")
             print("Unit tests failed")
             return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

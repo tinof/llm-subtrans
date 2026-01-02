@@ -14,15 +14,19 @@ from PySubtrans.SubtitleLine import SubtitleLine
 from PySubtrans.Subtitles import Subtitles
 from ..TestData.chinese_dinner import chinese_dinner_data
 
+
 class SubtitleEditorTests(SubtitleTestCase):
     """Test suite for SubtitleEditor class functionality"""
 
     def __init__(self, methodName):
-        super().__init__(methodName, custom_options={
-            'max_batch_size': 10,
-            'min_batch_size': 1,
-            'scene_threshold': 5.0,  # 5 second scene breaks for testing
-        })
+        super().__init__(
+            methodName,
+            custom_options={
+                "max_batch_size": 10,
+                "min_batch_size": 1,
+                "scene_threshold": 5.0,  # 5 second scene breaks for testing
+            },
+        )
 
     def setUp(self):
         """Set up test fixtures"""
@@ -32,15 +36,19 @@ class SubtitleEditorTests(SubtitleTestCase):
         self.test_srt_file = os.path.join(self.temp_dir, "test.srt")
 
         self.line_structure = [[4, 3], [3, 3], [4]]
-        self.test_lines = BuildSubtitlesFromLineCounts(self.line_structure).originals or []
+        self.test_lines = (
+            BuildSubtitlesFromLineCounts(self.line_structure).originals or []
+        )
 
         # Write test SRT content
-        with open(self.test_srt_file, 'w', encoding='utf-8') as f:
-            original_content = chinese_dinner_data.get_str('original') or ''
+        with open(self.test_srt_file, "w", encoding="utf-8") as f:
+            original_content = chinese_dinner_data.get_str("original") or ""
             f.write(original_content)
 
         # Create subtitles object with test data
-        self.subtitles = Subtitles(settings=SettingsType({'target_language': 'English'}))
+        self.subtitles = Subtitles(
+            settings=SettingsType({"target_language": "English"})
+        )
         self.subtitles.originals = self.test_lines.copy()
 
     def tearDown(self):
@@ -73,7 +81,9 @@ class SubtitleEditorTests(SubtitleTestCase):
         """Test that exit callback is invoked with success flag when no exception occurs"""
 
         callback_results: list[bool] = []
-        editor = SubtitleEditor(self.subtitles, lambda success: callback_results.append(success))
+        editor = SubtitleEditor(
+            self.subtitles, lambda success: callback_results.append(success)
+        )
 
         with editor:
             pass
@@ -87,7 +97,9 @@ class SubtitleEditorTests(SubtitleTestCase):
         callback_results: list[bool] = []
 
         with self.assertRaises(ValueError):
-            with SubtitleEditor(self.subtitles, lambda success: callback_results.append(success)):
+            with SubtitleEditor(
+                self.subtitles, lambda success: callback_results.append(success)
+            ):
                 raise ValueError("Test exception for callback")
 
         self.assertLoggedEqual("callback invoked on failure", 1, len(callback_results))
@@ -96,6 +108,7 @@ class SubtitleEditorTests(SubtitleTestCase):
     @skip_if_debugger_attached
     def test_exit_callback_exception_propagates(self):
         """Exit callback exceptions should propagate out of the context manager"""
+
         def failing_callback(_: bool) -> None:
             raise RuntimeError("Callback failure")
 
@@ -105,8 +118,9 @@ class SubtitleEditorTests(SubtitleTestCase):
             with editor:
                 pass
 
-        self.assertLoggedFalse("lock released after callback failure", editor._lock_acquired)
-
+        self.assertLoggedFalse(
+            "lock released after callback failure", editor._lock_acquired
+        )
 
     def test_autobatch_functionality(self):
         """Test AutoBatch divides subtitles into scenes and batches"""
@@ -135,7 +149,9 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             if first_scene:
                 first_scene_batch_count = len(first_scene.batches)
-                self.assertLoggedGreater("first scene has batches", first_scene_batch_count, 0)
+                self.assertLoggedGreater(
+                    "first scene has batches", first_scene_batch_count, 0
+                )
 
     def test_add_scene(self):
         """Test AddScene adds a new scene to the subtitles"""
@@ -146,11 +162,13 @@ class SubtitleEditorTests(SubtitleTestCase):
             initial_count = len(self.subtitles.scenes)
 
             # Create and add a new scene
-            new_scene = SubtitleScene({'number': 99, 'summary': 'Test scene'})
+            new_scene = SubtitleScene({"number": 99, "summary": "Test scene"})
             editor.AddScene(new_scene)
 
             new_count = len(self.subtitles.scenes)
-            self.assertLoggedEqual("scene count increased", initial_count + 1, new_count)
+            self.assertLoggedEqual(
+                "scene count increased", initial_count + 1, new_count
+            )
 
             # Verify the scene was added
             added_scene = self.subtitles.scenes[-1]
@@ -178,16 +196,20 @@ class SubtitleEditorTests(SubtitleTestCase):
                         batch.originals[0].start,
                         batch.originals[0].end,
                         translation_text,
-                        {}
+                        {},
                     )
                     batch.AddTranslatedLine(translated_line)
 
                     # Verify translation was added
-                    self.assertLoggedTrue("batch has translations", batch.any_translated)
+                    self.assertLoggedTrue(
+                        "batch has translations", batch.any_translated
+                    )
 
                     # Verify we can retrieve the translation
                     retrieved_translation = batch.GetTranslatedLine(line_number)
-                    self.assertLoggedIsNotNone("translation retrieved", retrieved_translation)
+                    self.assertLoggedIsNotNone(
+                        "translation retrieved", retrieved_translation
+                    )
 
                     if retrieved_translation:
                         self.assertLoggedEqual(
@@ -211,11 +233,15 @@ class SubtitleEditorTests(SubtitleTestCase):
                 batch = scene.batches[0]
 
                 # Add invalid line (no line number)
-                invalid_line = SubtitleLine.Construct(0, timedelta(seconds=1), timedelta(seconds=2), "Invalid line", {})
+                invalid_line = SubtitleLine.Construct(
+                    0, timedelta(seconds=1), timedelta(seconds=2), "Invalid line", {}
+                )
                 batch.originals.append(invalid_line)
 
                 # Add line with missing start time
-                missing_start_line = SubtitleLine.Construct(999, None, timedelta(seconds=2), "Missing start", {})
+                missing_start_line = SubtitleLine.Construct(
+                    999, None, timedelta(seconds=2), "Missing start", {}
+                )
                 batch.originals.append(missing_start_line)
 
                 initial_line_count = len(batch.originals)
@@ -265,8 +291,12 @@ class SubtitleEditorTests(SubtitleTestCase):
                 # Verify numbering is messed up
                 first_scene_number = self.subtitles.scenes[0].number
                 second_scene_number = self.subtitles.scenes[1].number
-                self.assertLoggedEqual("first scene number before renumber", 5, first_scene_number)
-                self.assertLoggedEqual("second scene number before renumber", 10, second_scene_number)
+                self.assertLoggedEqual(
+                    "first scene number before renumber", 5, first_scene_number
+                )
+                self.assertLoggedEqual(
+                    "second scene number before renumber", 10, second_scene_number
+                )
 
                 # Apply renumbering
                 editor.RenumberScenes()
@@ -295,7 +325,9 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             # Should now have translations
             any_translated_after = self.subtitles.any_translated
-            self.assertLoggedTrue("has translations after duplication", any_translated_after)
+            self.assertLoggedTrue(
+                "has translations after duplication", any_translated_after
+            )
 
             # Verify translations match originals
             for scene in self.subtitles.scenes:
@@ -339,12 +371,13 @@ class SubtitleEditorTests(SubtitleTestCase):
                         batch.originals[0].start,
                         batch.originals[0].end,
                         "Direct translation",
-                        {}
+                        {},
                     )
                     batch.translated = [translated_line]
 
             # Should fail because translations already exist
             from PySubtrans.SubtitleError import SubtitleError
+
             with self.assertRaises(SubtitleError) as context:
                 editor.DuplicateOriginalsAsTranslations()
 
@@ -365,7 +398,10 @@ class SubtitleEditorTests(SubtitleTestCase):
             editor.AutoBatch(batcher)
 
             scene_number = 1
-            update_data = {'summary': 'Updated scene summary', 'custom_field': 'test_value'}
+            update_data = {
+                "summary": "Updated scene summary",
+                "custom_field": "test_value",
+            }
 
             # Apply update
             result = editor.UpdateScene(scene_number, update_data)
@@ -390,7 +426,10 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             scene_number = 1
             batch_number = 1
-            update_data = {'summary': 'Updated batch summary', 'custom_field': 'test_value'}
+            update_data = {
+                "summary": "Updated batch summary",
+                "custom_field": "test_value",
+            }
 
             # Apply update
             result = editor.UpdateBatch(scene_number, batch_number, update_data)
@@ -426,7 +465,7 @@ class SubtitleEditorTests(SubtitleTestCase):
             for deletion in deletions:
                 self.assertLoggedEqual("deletion is tuple", tuple, type(deletion))
 
-                scene_num, batch_num, deleted_originals, deleted_translated = deletion #type: ignore
+                scene_num, batch_num, deleted_originals, deleted_translated = deletion  # type: ignore
                 self.assertLoggedGreater(
                     f"deleted originals from batch ({scene_num},{batch_num})",
                     len(deleted_originals),
@@ -465,14 +504,18 @@ class SubtitleEditorTests(SubtitleTestCase):
             editor.AutoBatch(batcher)
 
             initial_scene_count = self.subtitles.scenecount
-            self.assertLoggedGreaterEqual("initial scene count >= 3", initial_scene_count, 3)
+            self.assertLoggedGreaterEqual(
+                "initial scene count >= 3", initial_scene_count, 3
+            )
 
             # Merge first two scenes
             merged_scene = editor.MergeScenes([1, 2])
 
             # Should have one fewer scene
             final_scene_count = self.subtitles.scenecount
-            self.assertLoggedEqual("scene count decreased", initial_scene_count - 1, final_scene_count)
+            self.assertLoggedEqual(
+                "scene count decreased", initial_scene_count - 1, final_scene_count
+            )
 
             # Merged scene should exist
             self.assertLoggedIsNotNone("merged scene returned", merged_scene)
@@ -513,20 +556,34 @@ class SubtitleEditorTests(SubtitleTestCase):
 
         # Use wider gap lines to get scenes with multiple batches
         multi_batch_lines = [
-            SubtitleLine.Construct(1, timedelta(seconds=1), timedelta(seconds=3), "Batch 1 line 1", {}),
-            SubtitleLine.Construct(2, timedelta(seconds=4), timedelta(seconds=6), "Batch 1 line 2", {}),
-            SubtitleLine.Construct(3, timedelta(seconds=7), timedelta(seconds=9), "Batch 1 line 3", {}),
-            SubtitleLine.Construct(4, timedelta(seconds=10), timedelta(seconds=12), "Batch 2 line 1", {}),
-            SubtitleLine.Construct(5, timedelta(seconds=13), timedelta(seconds=15), "Batch 2 line 2", {}),
+            SubtitleLine.Construct(
+                1, timedelta(seconds=1), timedelta(seconds=3), "Batch 1 line 1", {}
+            ),
+            SubtitleLine.Construct(
+                2, timedelta(seconds=4), timedelta(seconds=6), "Batch 1 line 2", {}
+            ),
+            SubtitleLine.Construct(
+                3, timedelta(seconds=7), timedelta(seconds=9), "Batch 1 line 3", {}
+            ),
+            SubtitleLine.Construct(
+                4, timedelta(seconds=10), timedelta(seconds=12), "Batch 2 line 1", {}
+            ),
+            SubtitleLine.Construct(
+                5, timedelta(seconds=13), timedelta(seconds=15), "Batch 2 line 2", {}
+            ),
         ]
 
         self.subtitles.originals = multi_batch_lines
         # Use smaller batch size to create multiple batches
-        small_batch_batcher = SubtitleBatcher(SettingsType({
-            'max_batch_size': 3,
-            'min_batch_size': 1,
-            'scene_threshold': 30.0  # Large threshold to keep in one scene
-        }))
+        small_batch_batcher = SubtitleBatcher(
+            SettingsType(
+                {
+                    "max_batch_size": 3,
+                    "min_batch_size": 1,
+                    "scene_threshold": 30.0,  # Large threshold to keep in one scene
+                }
+            )
+        )
 
         with SubtitleEditor(self.subtitles) as editor:
             editor.AutoBatch(small_batch_batcher)
@@ -542,18 +599,24 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             if scene_to_split:
                 initial_batch_count = len(scene_to_split.batches)
-                self.assertLoggedGreaterEqual("scene has multiple batches", initial_batch_count, 2)
+                self.assertLoggedGreaterEqual(
+                    "scene has multiple batches", initial_batch_count, 2
+                )
 
                 # Split at batch 2
                 editor.SplitScene(scene_to_split.number, 2)
 
                 # Should have one more scene
                 final_scene_count = self.subtitles.scenecount
-                self.assertLoggedEqual("scene count increased", initial_scene_count + 1, final_scene_count)
+                self.assertLoggedEqual(
+                    "scene count increased", initial_scene_count + 1, final_scene_count
+                )
 
                 # All scenes should be numbered sequentially
                 for i, scene in enumerate(self.subtitles.scenes, 1):
-                    self.assertLoggedEqual(f"scene {i} numbered correctly", i, scene.number)
+                    self.assertLoggedEqual(
+                        f"scene {i} numbered correctly", i, scene.number
+                    )
 
     def test_merge_lines_in_batch(self):
         """Test MergeLinesInBatch combines lines within a batch"""
@@ -579,20 +642,29 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             if target_batch:
                 initial_line_count = len(target_batch.originals)
-                self.assertLoggedGreaterEqual("batch has multiple lines", initial_line_count, 2)
+                self.assertLoggedGreaterEqual(
+                    "batch has multiple lines", initial_line_count, 2
+                )
 
                 # Get first two line numbers
-                line_numbers = [target_batch.originals[0].number, target_batch.originals[1].number]
+                line_numbers = [
+                    target_batch.originals[0].number,
+                    target_batch.originals[1].number,
+                ]
 
                 # Merge the lines
-                merged_original, _ = editor.MergeLinesInBatch(scene_num, batch_num, line_numbers)
+                merged_original, _ = editor.MergeLinesInBatch(
+                    scene_num, batch_num, line_numbers
+                )
 
                 # Should return merged lines
                 self.assertLoggedIsNotNone("merged original returned", merged_original)
 
                 # Batch should have fewer lines now
                 final_line_count = len(target_batch.originals)
-                self.assertLoggedLess("line count decreased", final_line_count, initial_line_count)
+                self.assertLoggedLess(
+                    "line count decreased", final_line_count, initial_line_count
+                )
 
     def test_context_manager_with_real_subtitles(self):
         """Test SubtitleEditor context manager with real subtitle data"""
@@ -639,7 +711,7 @@ class SubtitleEditorTests(SubtitleTestCase):
             new_text = "Updated text content"
 
             # Update the line text
-            result = editor.UpdateLine(test_line_number, {'text': new_text})
+            result = editor.UpdateLine(test_line_number, {"text": new_text})
 
             self.assertLoggedTrue("update line returned True", result)
 
@@ -668,7 +740,9 @@ class SubtitleEditorTests(SubtitleTestCase):
             new_translation = "New translation text"
 
             # Update with translation
-            result = editor.UpdateLine(test_line_number, {'translation': new_translation})
+            result = editor.UpdateLine(
+                test_line_number, {"translation": new_translation}
+            )
 
             self.assertLoggedTrue("update line returned True", result)
 
@@ -677,12 +751,18 @@ class SubtitleEditorTests(SubtitleTestCase):
             self.assertLoggedIsNotNone("translation created", translated_line)
 
             if translated_line:
-                self.assertLoggedEqual("translation text correct", new_translation, translated_line.text)
+                self.assertLoggedEqual(
+                    "translation text correct", new_translation, translated_line.text
+                )
 
                 # Verify original line also has translation reference
                 original_line = batch.GetOriginalLine(test_line_number)
                 assert original_line is not None
-                self.assertLoggedEqual("original line translation", new_translation, original_line.translation)
+                self.assertLoggedEqual(
+                    "original line translation",
+                    new_translation,
+                    original_line.translation,
+                )
 
     def test_update_line_translation_existing(self):
         """Test UpdateLine updates existing translation"""
@@ -699,7 +779,7 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             # Create initial translation
             initial_translation = "Initial translation"
-            editor.UpdateLine(test_line_number, {'translation': initial_translation})
+            editor.UpdateLine(test_line_number, {"translation": initial_translation})
 
             # Verify translation exists
             translated_line = batch.GetTranslatedLine(test_line_number)
@@ -709,14 +789,18 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             # Update existing translation
             new_translation = "Updated translation text"
-            result = editor.UpdateLine(test_line_number, {'translation': new_translation})
+            result = editor.UpdateLine(
+                test_line_number, {"translation": new_translation}
+            )
 
             self.assertLoggedTrue("update existing translation returned True", result)
 
             # Verify translation was updated
             updated_translated_line = batch.GetTranslatedLine(test_line_number)
             assert updated_translated_line is not None
-            self.assertLoggedEqual("translation updated", new_translation, updated_translated_line.text)
+            self.assertLoggedEqual(
+                "translation updated", new_translation, updated_translated_line.text
+            )
 
     def test_update_line_timing(self):
         """Test UpdateLine updates start and end times"""
@@ -739,10 +823,9 @@ class SubtitleEditorTests(SubtitleTestCase):
             new_end = timedelta(seconds=15)
 
             # Update timing
-            result = editor.UpdateLine(test_line_number, {
-                'start': new_start,
-                'end': new_end
-            })
+            result = editor.UpdateLine(
+                test_line_number, {"start": new_start, "end": new_end}
+            )
 
             self.assertLoggedTrue("update timing returned True", result)
 
@@ -768,7 +851,7 @@ class SubtitleEditorTests(SubtitleTestCase):
             assert batch is not None
 
             # Create translation first
-            editor.UpdateLine(test_line_number, {'translation': "Test translation"})
+            editor.UpdateLine(test_line_number, {"translation": "Test translation"})
 
             translated_line = batch.GetTranslatedLine(test_line_number)
             self.assertIsNotNone(translated_line)
@@ -777,19 +860,26 @@ class SubtitleEditorTests(SubtitleTestCase):
             new_end = timedelta(seconds=25)
 
             # Update timing and translation
-            result = editor.UpdateLine(test_line_number, {
-                'start': new_start,
-                'end': new_end,
-                'translation': "Updated translation"
-            })
+            result = editor.UpdateLine(
+                test_line_number,
+                {
+                    "start": new_start,
+                    "end": new_end,
+                    "translation": "Updated translation",
+                },
+            )
 
             self.assertLoggedTrue("update with sync returned True", result)
 
             # Verify translated line timing was synced
             updated_translated_line = batch.GetTranslatedLine(test_line_number)
             assert updated_translated_line is not None
-            self.assertLoggedEqual("translated start synced", new_start, updated_translated_line.start)
-            self.assertLoggedEqual("translated end synced", new_end, updated_translated_line.end)
+            self.assertLoggedEqual(
+                "translated start synced", new_start, updated_translated_line.start
+            )
+            self.assertLoggedEqual(
+                "translated end synced", new_end, updated_translated_line.end
+            )
             self.assertEqual(updated_translated_line.start, new_start)
             self.assertEqual(updated_translated_line.end, new_end)
 
@@ -810,17 +900,19 @@ class SubtitleEditorTests(SubtitleTestCase):
             self.assertIsNotNone(original_line)
             assert original_line is not None
 
-            new_metadata = {'speaker': 'John', 'emotion': 'angry', 'volume': 'loud'}
+            new_metadata = {"speaker": "John", "emotion": "angry", "volume": "loud"}
 
             # Update metadata
-            result = editor.UpdateLine(test_line_number, {'metadata': new_metadata})
+            result = editor.UpdateLine(test_line_number, {"metadata": new_metadata})
 
             self.assertLoggedTrue("update metadata returned True", result)
 
             # Verify metadata was updated
             updated_line = batch.GetOriginalLine(test_line_number)
             assert updated_line is not None
-            self.assertLoggedEqual("metadata updated", new_metadata, updated_line.metadata)
+            self.assertLoggedEqual(
+                "metadata updated", new_metadata, updated_line.metadata
+            )
             self.assertEqual(updated_line.metadata, new_metadata)
 
     def test_update_line_multiple_fields(self):
@@ -840,16 +932,19 @@ class SubtitleEditorTests(SubtitleTestCase):
             new_translation = "Multi-field translation"
             new_start = timedelta(seconds=30)
             new_end = timedelta(seconds=35)
-            new_metadata = {'test': 'multi-field'}
+            new_metadata = {"test": "multi-field"}
 
             # Update multiple fields
-            result = editor.UpdateLine(test_line_number, {
-                'text': new_text,
-                'translation': new_translation,
-                'start': new_start,
-                'end': new_end,
-                'metadata': new_metadata
-            })
+            result = editor.UpdateLine(
+                test_line_number,
+                {
+                    "text": new_text,
+                    "translation": new_translation,
+                    "start": new_start,
+                    "end": new_end,
+                    "metadata": new_metadata,
+                },
+            )
 
             self.assertLoggedTrue("multi-field update returned True", result)
 
@@ -857,10 +952,14 @@ class SubtitleEditorTests(SubtitleTestCase):
             updated_line = batch.GetOriginalLine(test_line_number)
             assert updated_line is not None
             self.assertLoggedEqual("text updated", new_text, updated_line.text)
-            self.assertLoggedEqual("translation updated", new_translation, updated_line.translation)
+            self.assertLoggedEqual(
+                "translation updated", new_translation, updated_line.translation
+            )
             self.assertLoggedEqual("start updated", new_start, updated_line.start)
             self.assertLoggedEqual("end updated", new_end, updated_line.end)
-            self.assertLoggedEqual("metadata updated", new_metadata, updated_line.metadata)
+            self.assertLoggedEqual(
+                "metadata updated", new_metadata, updated_line.metadata
+            )
 
             self.assertEqual(updated_line.text, new_text)
             self.assertEqual(updated_line.translation, new_translation)
@@ -895,11 +994,14 @@ class SubtitleEditorTests(SubtitleTestCase):
             assert original_line is not None
 
             # Update with same values
-            result = editor.UpdateLine(test_line_number, {
-                'text': original_line.text,
-                'start': original_line.start,
-                'end': original_line.end
-            })
+            result = editor.UpdateLine(
+                test_line_number,
+                {
+                    "text": original_line.text,
+                    "start": original_line.start,
+                    "end": original_line.end,
+                },
+            )
 
             self.assertLoggedFalse("no change update returned False", result)
 
@@ -913,7 +1015,7 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             # Try to update non-existent line
             with self.assertRaises(ValueError) as context:
-                editor.UpdateLine(999, {'text': 'Should fail'})
+                editor.UpdateLine(999, {"text": "Should fail"})
 
             error_message = str(context.exception)
             self.assertLoggedTrue(
@@ -934,7 +1036,7 @@ class SubtitleEditorTests(SubtitleTestCase):
 
             # Try to update with invalid start time
             with self.assertRaises(ValueError) as context:
-                editor.UpdateLine(test_line_number, {'start': 'invalid time'})
+                editor.UpdateLine(test_line_number, {"start": "invalid time"})
 
             error_message = str(context.exception)
             self.assertLoggedTrue(
@@ -944,5 +1046,5 @@ class SubtitleEditorTests(SubtitleTestCase):
             )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

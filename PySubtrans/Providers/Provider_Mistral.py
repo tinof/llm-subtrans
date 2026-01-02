@@ -7,7 +7,10 @@ from PySubtrans.SettingsType import GuiSettingsType, SettingsType
 
 if not importlib.util.find_spec("mistralai"):
     from PySubtrans.Helpers.Localization import _
-    logging.debug(_("Mistral SDK is not installed. Mistral provider will not be available"))
+
+    logging.debug(
+        _("Mistral SDK is not installed. Mistral provider will not be available")
+    )
 else:
     try:
         import mistralai
@@ -29,53 +32,93 @@ else:
             <p>Note that Mistral provide many specialised models that are unlikely to be useful as translators.</p>
             """
 
-            def __init__(self, settings : SettingsType):
-                super().__init__(self.name, SettingsType({
-                    "api_key": settings.get_str('api_key', os.getenv('MISTRAL_API_KEY')),
-                    "server_url": settings.get_str('server_url', os.getenv('MISTRAL_SERVER_URL')),
-                    "model": settings.get_str('model', os.getenv('MISTRAL_MODEL', "open-mistral-nemo")),
-                    'temperature': settings.get_float('temperature', env_float('MISTRAL_TEMPERATURE', 0.0)),
-                    'rate_limit': settings.get_float('rate_limit', env_float('MISTRAL_RATE_LIMIT')),
-                }))
+            def __init__(self, settings: SettingsType):
+                super().__init__(
+                    self.name,
+                    SettingsType(
+                        {
+                            "api_key": settings.get_str(
+                                "api_key", os.getenv("MISTRAL_API_KEY")
+                            ),
+                            "server_url": settings.get_str(
+                                "server_url", os.getenv("MISTRAL_SERVER_URL")
+                            ),
+                            "model": settings.get_str(
+                                "model", os.getenv("MISTRAL_MODEL", "open-mistral-nemo")
+                            ),
+                            "temperature": settings.get_float(
+                                "temperature", env_float("MISTRAL_TEMPERATURE", 0.0)
+                            ),
+                            "rate_limit": settings.get_float(
+                                "rate_limit", env_float("MISTRAL_RATE_LIMIT")
+                            ),
+                        }
+                    ),
+                )
 
-                self.refresh_when_changed = ['api_key', 'server_url', 'model']
+                self.refresh_when_changed = ["api_key", "server_url", "model"]
 
             @property
-            def api_key(self) -> str|None:
-                return self.settings.get_str( 'api_key')
+            def api_key(self) -> str | None:
+                return self.settings.get_str("api_key")
 
             @property
-            def server_url(self) -> str|None:
-                return self.settings.get_str( 'server_url')
+            def server_url(self) -> str | None:
+                return self.settings.get_str("server_url")
 
-            def GetTranslationClient(self, settings : SettingsType) -> TranslationClient:
+            def GetTranslationClient(self, settings: SettingsType) -> TranslationClient:
                 client_settings = SettingsType(self.settings.copy())
                 client_settings.update(settings)
-                client_settings.update({
-                    'supports_conversation': True,
-                    'supports_system_messages': True,
-                    'supports_system_messages_for_retry': False,
-                    'supports_system_prompt': False
-                    })
+                client_settings.update(
+                    {
+                        "supports_conversation": True,
+                        "supports_system_messages": True,
+                        "supports_system_messages_for_retry": False,
+                        "supports_system_prompt": False,
+                    }
+                )
                 return MistralClient(client_settings)
 
-            def GetOptions(self, settings : SettingsType) -> GuiSettingsType:
-                options : GuiSettingsType = {
-                    'api_key': (str, _("A Mistral API key is required to use this provider (https://console.mistral.ai/api-keys/)")),
-                    'server_url': (str, _("The base URL to use for requests (default is https://api.mistral.ai)")),
+            def GetOptions(self, settings: SettingsType) -> GuiSettingsType:
+                options: GuiSettingsType = {
+                    "api_key": (
+                        str,
+                        _(
+                            "A Mistral API key is required to use this provider (https://console.mistral.ai/api-keys/)"
+                        ),
+                    ),
+                    "server_url": (
+                        str,
+                        _(
+                            "The base URL to use for requests (default is https://api.mistral.ai)"
+                        ),
+                    ),
                 }
 
                 if self.api_key:
                     models = self.available_models
                     if models:
-                        options.update({
-                            'model': (models, "AI model to use as the translator"),
-                            'temperature': (float, _("Amount of random variance to add to translations. Generally speaking, none is best")),
-                            'rate_limit': (float, _("Maximum API requests per minute."))
-                        })
+                        options.update(
+                            {
+                                "model": (models, "AI model to use as the translator"),
+                                "temperature": (
+                                    float,
+                                    _(
+                                        "Amount of random variance to add to translations. Generally speaking, none is best"
+                                    ),
+                                ),
+                                "rate_limit": (
+                                    float,
+                                    _("Maximum API requests per minute."),
+                                ),
+                            }
+                        )
 
                     else:
-                        options['model'] = (["Unable to retrieve models"], _("Check API key and base URL and try again"))
+                        options["model"] = (
+                            ["Unable to retrieve models"],
+                            _("Check API key and base URL and try again"),
+                        )
 
                 return options
 
@@ -89,20 +132,23 @@ else:
                         return []
 
                     client = mistralai.Mistral(
-                        api_key=self.api_key,
-                        server_url=self.server_url or None
+                        api_key=self.api_key, server_url=self.server_url or None
                     )
                     response = client.models.list()
 
                     if not response or not response.data:
                         return []
 
-                    model_list = [ model.id for model in response.data]
+                    model_list = [model.id for model in response.data]
 
                     return sorted(model_list)
 
                 except Exception as e:
-                    logging.error(_("Unable to retrieve available AI models: {error}").format(error=str(e)))
+                    logging.error(
+                        _("Unable to retrieve available AI models: {error}").format(
+                            error=str(e)
+                        )
+                    )
                     return []
 
             def GetInformation(self) -> str:
@@ -124,11 +170,14 @@ else:
                 """
                 If user has set a rate limit we can't make multiple requests at once
                 """
-                if self.settings.get_float( 'rate_limit', 0.0) != 0.0:
+                if self.settings.get_float("rate_limit", 0.0) != 0.0:
                     return False
 
                 return True
 
     except ImportError:
         from PySubtrans.Helpers.Localization import _
-        logging.info(_("Mistral SDK not installed. Mistral provider will not be available"))
+
+        logging.info(
+            _("Mistral SDK not installed. Mistral provider will not be available")
+        )

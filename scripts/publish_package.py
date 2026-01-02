@@ -28,6 +28,7 @@ The script will:
 4. Build wheel and source distributions
 5. Upload to the specified repository (unless --skip-upload)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -46,16 +47,29 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
 PACKAGE_NAME = "pysubtrans"
 PACKAGE_DESCRIPTION = "Core subtitle translation toolkit used by LLM-Subtrans"
 HOMEPAGE_URL = "https://github.com/machinewrapped/llm-subtrans"
-DOCUMENTATION_URL = "https://github.com/machinewrapped/llm-subtrans/blob/main/PySubtrans/README.md"
+DOCUMENTATION_URL = (
+    "https://github.com/machinewrapped/llm-subtrans/blob/main/PySubtrans/README.md"
+)
 ISSUES_URL = "https://github.com/machinewrapped/llm-subtrans/issues"
 
 
 def ParseArguments() -> argparse.Namespace:
     """Parse command line arguments for the publish workflow."""
-    parser = argparse.ArgumentParser(description="Build and publish the PySubtrans package")
-    parser.add_argument("--yes", action="store_true", help="Assume yes for all confirmation prompts")
-    parser.add_argument("--skip-upload", action="store_true", help="Skip the upload step")
-    parser.add_argument("--repository", type=str, default=None, help="Named repository configured in ~/.pypirc (e.g. testpypi)")
+    parser = argparse.ArgumentParser(
+        description="Build and publish the PySubtrans package"
+    )
+    parser.add_argument(
+        "--yes", action="store_true", help="Assume yes for all confirmation prompts"
+    )
+    parser.add_argument(
+        "--skip-upload", action="store_true", help="Skip the upload step"
+    )
+    parser.add_argument(
+        "--repository",
+        type=str,
+        default=None,
+        help="Named repository configured in ~/.pypirc (e.g. testpypi)",
+    )
     return parser.parse_args()
 
 
@@ -144,7 +158,9 @@ def WritePackageToml(
     path.write_text(content, encoding="utf-8")
 
 
-def PrintSummary(version: str, dependencies: list[str], optional: dict[str, list[str]]) -> None:
+def PrintSummary(
+    version: str, dependencies: list[str], optional: dict[str, list[str]]
+) -> None:
     """Display the key package metadata before building."""
     print("PySubtrans package configuration")
     print(f"  Version: {version}")
@@ -206,7 +222,7 @@ def BuildPackage(package_dir: Path) -> None:
     subprocess.run(command, cwd=package_dir, check=True)
 
 
-def UploadPackage(dist_dir: Path, repository: str|None = None) -> None:
+def UploadPackage(dist_dir: Path, repository: str | None = None) -> None:
     """Upload the built distributions using twine."""
     if not dist_dir.exists():
         raise FileNotFoundError(f"Distribution directory {dist_dir} does not exist")
@@ -237,7 +253,7 @@ def GetPackageVersion(package_dir: Path) -> str:
             # Extract version string from __version__ = "vX.Y.Z" format
             version = line.split("=", 1)[1].strip().strip('"').strip("'")
             # Remove 'v' prefix if present
-            if version.startswith('v'):
+            if version.startswith("v"):
                 version = version[1:]
             return version
 
@@ -272,7 +288,9 @@ def Main() -> None:
         if name != "gui"
     }
 
-    WritePackageToml(package_pyproject, version, dependencies, optional, requires_python, package_dir)
+    WritePackageToml(
+        package_pyproject, version, dependencies, optional, requires_python, package_dir
+    )
     PrintSummary(version, dependencies, optional)
 
     try:

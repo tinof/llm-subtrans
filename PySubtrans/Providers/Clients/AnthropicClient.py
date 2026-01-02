@@ -7,52 +7,58 @@ import anthropic
 from PySubtrans.Helpers import FormatMessages
 from PySubtrans.Helpers.Localization import _
 from PySubtrans.Options import SettingsType
-from PySubtrans.SubtitleError import TranslationError, TranslationResponseError, TranslationImpossibleError
+from PySubtrans.SubtitleError import TranslationError, TranslationImpossibleError
 from PySubtrans.TranslationClient import TranslationClient
 from PySubtrans.Translation import Translation
 from PySubtrans.TranslationPrompt import TranslationPrompt
 from PySubtrans.TranslationRequest import TranslationRequest
 
-linesep = '\n'
+linesep = "\n"
+
 
 class AnthropicClient(TranslationClient):
     """
     Handles communication with Claude via the anthropic SDK
     """
-    def __init__(self, settings : SettingsType):
+
+    def __init__(self, settings: SettingsType):
         super().__init__(settings)
 
-        self._emit_info(_("Translating with Anthropic {model}").format(
-            model=self.model or _("default model")
-        ))
+        self._emit_info(
+            _("Translating with Anthropic {model}").format(
+                model=self.model or _("default model")
+            )
+        )
 
     @property
-    def api_key(self) -> str|None:
-        return self.settings.get_str( 'api_key')
+    def api_key(self) -> str | None:
+        return self.settings.get_str("api_key")
 
     @property
-    def model(self) -> str|None:
-        return self.settings.get_str( 'model')
+    def model(self) -> str | None:
+        return self.settings.get_str("model")
 
     @property
     def max_tokens(self) -> int:
-        return self.settings.get_int( 'max_tokens') or 0
-    
+        return self.settings.get_int("max_tokens") or 0
+
     @property
     def allow_thinking(self) -> bool:
-        return self.settings.get_bool( 'thinking', False)
-    
+        return self.settings.get_bool("thinking", False)
+
     @property
-    def thinking(self) -> dict|anthropic.NotGiven:
+    def thinking(self) -> dict | anthropic.NotGiven:
         if self.allow_thinking:
             return {
-                'type' : 'enabled',
-                'budget_tokens' : self.settings.get_int( 'max_thinking_tokens', 1024)
+                "type": "enabled",
+                "budget_tokens": self.settings.get_int("max_thinking_tokens", 1024),
             }
-        
+
         return anthropic.NOT_GIVEN
 
-    def _request_translation(self, request: TranslationRequest, temperature: float|None = None) -> Translation|None:
+    def _request_translation(
+        self, request: TranslationRequest, temperature: float | None = None
+    ) -> Translation | None:
         """
         Request a translation based on the provided prompt
         """
@@ -60,15 +66,15 @@ class AnthropicClient(TranslationClient):
             self.client = anthropic.Anthropic(api_key=self.api_key)
 
             # Try to add proxy settings if specified
-            proxy = self.settings.get_str( 'proxy')
+            proxy = self.settings.get_str("proxy")
             if proxy:
-                http_client = anthropic.DefaultHttpxClient(
-                    proxy = proxy
-                )
+                http_client = anthropic.DefaultHttpxClient(proxy=proxy)
                 self.client = self.client.with_options(http_client=http_client)
 
         except Exception as e:
-            raise TranslationImpossibleError(_("Failed to initialize Anthropic client"), error=e)
+            raise TranslationImpossibleError(
+                _("Failed to initialize Anthropic client"), error=e
+            )
 
         prompt: TranslationPrompt = request.prompt
         logging.debug(f"Messages:\n{FormatMessages(prompt.messages)}")
@@ -90,14 +96,22 @@ class AnthropicClient(TranslationClient):
 
         if translation:
             if translation.quota_reached:
-                raise TranslationImpossibleError(_("Anthropic account quota reached, please upgrade your plan or wait until it renews"))
+                raise TranslationImpossibleError(
+                    _(
+                        "Anthropic account quota reached, please upgrade your plan or wait until it renews"
+                    )
+                )
 
             if translation.reached_token_limit:
-                raise TranslationError(_("Too many tokens in translation"), translation=translation)
+                raise TranslationError(
+                    _("Too many tokens in translation"), translation=translation
+                )
 
         return translation
 
-    def _send_messages(self, request: TranslationRequest, temperature: float) -> dict[str, Any]|None:
+    def _send_messages(
+        self, request: TranslationRequest, temperature: float
+    ) -> dict[str, Any] | None:
         """
         Make a request to the LLM to provide a translation
         """
@@ -112,22 +126,22 @@ class AnthropicClient(TranslationClient):
         # Process the response
         result = {}
 
-        if api_response.stop_reason == 'max_tokens':
-            result['finish_reason'] = "length"
+        if api_response.stop_reason == "max_tokens":
+            result["finish_reason"] = "length"
         else:
-            result['finish_reason'] = api_response.stop_reason
+            result["finish_reason"] = api_response.stop_reason
 
         if api_response.usage:
-            result['prompt_tokens'] = getattr(api_response.usage, 'input_tokens')
-            result['output_tokens'] = getattr(api_response.usage, 'output_tokens')
+            result["prompt_tokens"] = getattr(api_response.usage, "input_tokens")
+            result["output_tokens"] = getattr(api_response.usage, "output_tokens")
 
         for piece in api_response.content:
-            if piece.type == 'thinking':
-                result['reasoning'] = piece.thinking
-            elif piece.type == 'redacted_thinking':
-                result['reasoning'] = "Reasoning redacted by API"
-            elif piece.type == 'text':
-                result['text'] = piece.text
+            if piece.type == "thinking":
+                result["reasoning"] = piece.thinking
+            elif piece.type == "redacted_thinking":
+                result["reasoning"] = "Reasoning redacted by API"
+            elif piece.type == "text":
+                result["text"] = piece.text
                 break
 
         return result
@@ -151,11 +165,11 @@ class AnthropicClient(TranslationClient):
                 if request.is_streaming and self.enable_streaming:
                     with self.client.messages.stream(
                         model=self.model,
-                        thinking=self.thinking,     # type: ignore
-                        messages=prompt.content,          # type: ignore
+                        thinking=self.thinking,  # type: ignore
+                        messages=prompt.content,  # type: ignore
                         system=prompt.system_prompt,
                         temperature=temperature if not self.allow_thinking else 1,
-                        max_tokens=self.max_tokens
+                        max_tokens=self.max_tokens,
                     ) as stream:
                         for text in stream.text_stream:
                             if self.aborted:
@@ -166,19 +180,23 @@ class AnthropicClient(TranslationClient):
                 else:
                     return self.client.messages.create(
                         model=self.model,
-                        thinking=self.thinking,     # type: ignore
-                        messages=prompt.content,          # type: ignore
+                        thinking=self.thinking,  # type: ignore
+                        messages=prompt.content,  # type: ignore
                         system=prompt.system_prompt,
                         temperature=temperature if not self.allow_thinking else 1,
-                        max_tokens=self.max_tokens
+                        max_tokens=self.max_tokens,
                     )
 
             except (anthropic.APITimeoutError, anthropic.RateLimitError) as e:
                 if retry < self.max_retries and not self.aborted:
                     sleep_time = self.backoff_time * 2.0**retry
-                    self._emit_warning(_("Anthropic API error: {error}, retrying in {sleep_time} seconds...").format(
-                        error=self._get_error_message(e), sleep_time=sleep_time
-                    ))
+                    self._emit_warning(
+                        _(
+                            "Anthropic API error: {error}, retrying in {sleep_time} seconds..."
+                        ).format(
+                            error=self._get_error_message(e), sleep_time=sleep_time
+                        )
+                    )
                     time.sleep(sleep_time)
                     continue
 
@@ -188,18 +206,20 @@ class AnthropicClient(TranslationClient):
             except Exception as e:
                 raise TranslationError(_("Error communicating with provider"), error=e)
 
-        raise TranslationImpossibleError(_("Failed to communicate with provider after {max_retries} retries").format(
-            max_retries=self.max_retries
-        ))
+        raise TranslationImpossibleError(
+            _("Failed to communicate with provider after {max_retries} retries").format(
+                max_retries=self.max_retries
+            )
+        )
 
-    def _get_error_message(self, e : anthropic.APIError) -> str:
-        """ 
+    def _get_error_message(self, e: anthropic.APIError) -> str:
+        """
         Extract a user-friendly error message from the API error
         """
-        if hasattr(e, 'body') and isinstance(e.body, dict):
-            if 'error' in e.body and isinstance(e.body['error'], dict):
-                return str(e.body['error'].get('message', str(e)))
-            elif 'message' in e.body:
-                return str(e.body['message'])
+        if hasattr(e, "body") and isinstance(e.body, dict):
+            if "error" in e.body and isinstance(e.body["error"], dict):
+                return str(e.body["error"].get("message", str(e)))
+            elif "message" in e.body:
+                return str(e.body["message"])
 
         return str(e)

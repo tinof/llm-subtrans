@@ -16,79 +16,111 @@ from google.genai.types import (
     HarmCategory,
     Part,
     SafetySetting,
-    ThinkingConfig
+    ThinkingConfig,
 )
 
 from PySubtrans.Helpers import FormatMessages
 from PySubtrans.Helpers.Localization import _
 from PySubtrans.Options import SettingsType
-from PySubtrans.SubtitleError import TranslationImpossibleError, TranslationResponseError
+from PySubtrans.SubtitleError import (
+    TranslationImpossibleError,
+    TranslationResponseError,
+)
 from PySubtrans.Translation import Translation
 from PySubtrans.TranslationClient import TranslationClient
 from PySubtrans.TranslationPrompt import TranslationPrompt
 from PySubtrans.TranslationRequest import TranslationRequest
 
+
 class GeminiClient(TranslationClient):
     """
     Handles communication with Google Gemini to request translations
     """
-    def __init__(self, settings : SettingsType):
+
+    def __init__(self, settings: SettingsType):
         super().__init__(settings)
 
-        self._emit_info(_("Translating with Gemini {model} model").format(
-            model=self.model or _("default")
-        ))
+        self._emit_info(
+            _("Translating with Gemini {model} model").format(
+                model=self.model or _("default")
+            )
+        )
 
         if self.use_vertex:
-            self._emit_info(_("Using Vertex AI project {project} in {location}").format(
-                project=self.vertex_project or _("(unspecified)"),
-                location=self.vertex_location or _("(unspecified)")
-            ))
+            self._emit_info(
+                _("Using Vertex AI project {project} in {location}").format(
+                    project=self.vertex_project or _("(unspecified)"),
+                    location=self.vertex_location or _("(unspecified)"),
+                )
+            )
 
         self.safety_settings: list[SafetySetting] = [
-            SafetySetting(category=HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=HarmBlockThreshold.OFF),
-            SafetySetting(category=HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=HarmBlockThreshold.OFF),
-            SafetySetting(category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=HarmBlockThreshold.OFF),
-            SafetySetting(category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=HarmBlockThreshold.OFF),
-            SafetySetting(category=HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold=HarmBlockThreshold.OFF)
+            SafetySetting(
+                category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=HarmBlockThreshold.OFF,
+            ),
+            SafetySetting(
+                category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=HarmBlockThreshold.OFF,
+            ),
+            SafetySetting(
+                category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=HarmBlockThreshold.OFF,
+            ),
+            SafetySetting(
+                category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=HarmBlockThreshold.OFF,
+            ),
+            SafetySetting(
+                category=HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+                threshold=HarmBlockThreshold.OFF,
+            ),
         ]
 
-        self.automatic_function_calling: AutomaticFunctionCallingConfig = AutomaticFunctionCallingConfig(disable=True, maximum_remote_calls=None)
+        self.automatic_function_calling: AutomaticFunctionCallingConfig = (
+            AutomaticFunctionCallingConfig(disable=True, maximum_remote_calls=None)
+        )
 
         # Configure reasoning parameters
-        enable_thinking = settings.get_bool('enable_thinking', False)
-        thinking_budget = settings.get_int('thinking_budget', -1)
-        include_thoughts = False # Gemini appends thoughts to the text if this is true, breaking the parser
+        enable_thinking = settings.get_bool("enable_thinking", False)
+        thinking_budget = settings.get_int("thinking_budget", -1)
+        include_thoughts = False  # Gemini appends thoughts to the text if this is true, breaking the parser
 
-        self.thinking_config: ThinkingConfig|None = ThinkingConfig(
-            include_thoughts=include_thoughts, thinking_budget=thinking_budget
-            ) if enable_thinking else None
-
-    @property
-    def api_key(self) -> str|None:
-        return self.settings.get_str( 'api_key')
-
-    @property
-    def model(self) -> str|None:
-        return self.settings.get_str( 'model')
+        self.thinking_config: ThinkingConfig | None = (
+            ThinkingConfig(
+                include_thoughts=include_thoughts, thinking_budget=thinking_budget
+            )
+            if enable_thinking
+            else None
+        )
 
     @property
-    def rate_limit(self) -> float|None:
-        return self.settings.get_float( 'rate_limit')
+    def api_key(self) -> str | None:
+        return self.settings.get_str("api_key")
+
+    @property
+    def model(self) -> str | None:
+        return self.settings.get_str("model")
+
+    @property
+    def rate_limit(self) -> float | None:
+        return self.settings.get_float("rate_limit")
 
     @property
     def use_vertex(self) -> bool:
-        return self.settings.get_bool('use_vertex', False)
+        return self.settings.get_bool("use_vertex", False)
 
     @property
-    def vertex_project(self) -> str|None:
-        return self.settings.get_str('vertex_project')
+    def vertex_project(self) -> str | None:
+        return self.settings.get_str("vertex_project")
 
     @property
-    def vertex_location(self) -> str|None:
-        return self.settings.get_str('vertex_location')
+    def vertex_location(self) -> str | None:
+        return self.settings.get_str("vertex_location")
 
-    def _request_translation(self, request: TranslationRequest, temperature: float|None = None) -> Translation|None:
+    def _request_translation(
+        self, request: TranslationRequest, temperature: float | None = None
+    ) -> Translation | None:
         """
         Request a translation based on the provided prompt
         """
@@ -110,7 +142,9 @@ class GeminiClient(TranslationClient):
     def _abort(self) -> None:
         return super()._abort()
 
-    def _send_messages(self, request: TranslationRequest, temperature: float) -> dict[str, Any]|None:
+    def _send_messages(
+        self, request: TranslationRequest, temperature: float
+    ) -> dict[str, Any] | None:
         """
         Make a request to the Gemini API to provide a translation
         """
@@ -126,18 +160,24 @@ class GeminiClient(TranslationClient):
 
             except Exception as e:
                 if retry == self.max_retries:
-                    raise TranslationImpossibleError(_("Failed to communicate with provider after {max_retries} retries").format(
-                        max_retries=self.max_retries
-                    ))
+                    raise TranslationImpossibleError(
+                        _(
+                            "Failed to communicate with provider after {max_retries} retries"
+                        ).format(max_retries=self.max_retries)
+                    )
 
                 if not self.aborted:
                     sleep_time = self.backoff_time * 2.0**retry
-                    self._emit_warning(_("Gemini request failure {error}, retrying in {sleep_time} seconds...").format(
-                        error=str(e), sleep_time=sleep_time
-                    ))
+                    self._emit_warning(
+                        _(
+                            "Gemini request failure {error}, retrying in {sleep_time} seconds..."
+                        ).format(error=str(e), sleep_time=sleep_time)
+                    )
                     time.sleep(sleep_time)
 
-    def _get_gemini_response(self, request: TranslationRequest, temperature: float) -> dict[str, Any]|None:
+    def _get_gemini_response(
+        self, request: TranslationRequest, temperature: float
+    ) -> dict[str, Any] | None:
         """
         Handle both streaming and non-streaming Gemini API calls
         """
@@ -157,7 +197,7 @@ class GeminiClient(TranslationClient):
             thinking_config=self.thinking_config,
             automatic_function_calling=self.automatic_function_calling,
             max_output_tokens=None,
-            response_modalities=[]
+            response_modalities=[],
         )
 
         if not request.is_streaming or not self.enable_streaming:
@@ -165,7 +205,7 @@ class GeminiClient(TranslationClient):
             gcr = gemini_client.models.generate_content(
                 model=self.model,
                 contents=Part.from_text(text=prompt.content),
-                config=config
+                config=config,
             )
 
             return self._process_gemini_response(gcr) if not self.aborted else None
@@ -174,13 +214,15 @@ class GeminiClient(TranslationClient):
         stream = gemini_client.models.generate_content_stream(
             model=self.model,
             contents=Part.from_text(text=prompt.content),
-            config=config
+            config=config,
         )
 
         last_chunk = None
         last_candidate: Candidate | None = None
         last_usage: GenerateContentResponseUsageMetadata | None = None
-        first_prompt_feedback = None  # when blocked, this can be set only on the first chunk
+        first_prompt_feedback = (
+            None  # when blocked, this can be set only on the first chunk
+        )
         accumulated_thoughts = ""
 
         for chunk in stream:
@@ -207,27 +249,27 @@ class GeminiClient(TranslationClient):
                 first_prompt_feedback = chunk.prompt_feedback
 
         # Build a synthetic response that keeps metadata but replaces content parts with accumulated text
-        parts = [Part.from_text(text = request.accumulated_text)]
+        parts = [Part.from_text(text=request.accumulated_text)]
 
         if accumulated_thoughts:
-            thought_part = Part.from_text(text = accumulated_thoughts)
+            thought_part = Part.from_text(text=accumulated_thoughts)
             thought_part.thought = True
             parts.append(thought_part)
 
         synthetic_candidate = Candidate(
             content=Content(role="model", parts=parts),
-            finish_reason = getattr(last_candidate, "finish_reason", None) or getattr(last_chunk, "finish_reason", None),
-            safety_ratings = getattr(last_candidate, "safety_ratings", None)
+            finish_reason=getattr(last_candidate, "finish_reason", None)
+            or getattr(last_chunk, "finish_reason", None),
+            safety_ratings=getattr(last_candidate, "safety_ratings", None),
         )
 
         response = GenerateContentResponse(
             candidates=[synthetic_candidate],
             usage_metadata=last_usage,
-            prompt_feedback=first_prompt_feedback
+            prompt_feedback=first_prompt_feedback,
         )
 
         return self._process_gemini_response(response) if not self.aborted else None
-
 
     def _process_gemini_response(self, gcr: GenerateContentResponse) -> dict[str, Any]:
         """
@@ -240,72 +282,111 @@ class GeminiClient(TranslationClient):
 
         if gcr.prompt_feedback and gcr.prompt_feedback.block_reason:
             block_info = self._extract_block_info(gcr)
-            raise TranslationImpossibleError(_("Request was blocked by Gemini: {block_info}").format(
-                block_info=block_info
-            ))
+            raise TranslationImpossibleError(
+                _("Request was blocked by Gemini: {block_info}").format(
+                    block_info=block_info
+                )
+            )
 
         # Try to find a validate candidate
-        candidates = [candidate for candidate in gcr.candidates if candidate.content] if gcr.candidates else []
-        candidates = [candidate for candidate in candidates if candidate.finish_reason == FinishReason.STOP] or candidates
+        candidates = (
+            [candidate for candidate in gcr.candidates if candidate.content]
+            if gcr.candidates
+            else []
+        )
+        candidates = [
+            candidate
+            for candidate in candidates
+            if candidate.finish_reason == FinishReason.STOP
+        ] or candidates
 
         if not candidates:
-            raise TranslationResponseError(_("No valid candidates returned in the response"), response=gcr)
+            raise TranslationResponseError(
+                _("No valid candidates returned in the response"), response=gcr
+            )
 
         candidate = candidates[0]
-        response['token_count'] = candidate.token_count
+        response["token_count"] = candidate.token_count
 
         finish_reason = candidate.finish_reason
         if finish_reason == "STOP" or finish_reason == FinishReason.STOP:
-            response['finish_reason'] = "complete"
+            response["finish_reason"] = "complete"
         elif finish_reason == "MAX_TOKENS" or finish_reason == FinishReason.MAX_TOKENS:
-            response['finish_reason'] = "length"
-            raise TranslationResponseError(_("Gemini response exceeded token limit"), response=candidate)
+            response["finish_reason"] = "length"
+            raise TranslationResponseError(
+                _("Gemini response exceeded token limit"), response=candidate
+            )
         elif finish_reason == "SAFETY" or finish_reason == FinishReason.SAFETY:
-            response['finish_reason'] = "blocked"
-            raise TranslationResponseError(_("Gemini response was blocked for safety reasons"), response=candidate)
+            response["finish_reason"] = "blocked"
+            raise TranslationResponseError(
+                _("Gemini response was blocked for safety reasons"), response=candidate
+            )
         elif finish_reason == "RECITATION" or finish_reason == FinishReason.RECITATION:
-            response['finish_reason'] = "recitation"
-            raise TranslationResponseError(_("Gemini response was blocked for recitation"), response=candidate)
-        elif finish_reason == "FINISH_REASON_UNSPECIFIED" or finish_reason == FinishReason.FINISH_REASON_UNSPECIFIED:
-            response['finish_reason'] = "unspecified"
-            raise TranslationResponseError(_("Gemini response was incomplete"), response=candidate)
+            response["finish_reason"] = "recitation"
+            raise TranslationResponseError(
+                _("Gemini response was blocked for recitation"), response=candidate
+            )
+        elif (
+            finish_reason == "FINISH_REASON_UNSPECIFIED"
+            or finish_reason == FinishReason.FINISH_REASON_UNSPECIFIED
+        ):
+            response["finish_reason"] = "unspecified"
+            raise TranslationResponseError(
+                _("Gemini response was incomplete"), response=candidate
+            )
         else:
             # Probably a failure
-            response['finish_reason'] = finish_reason
+            response["finish_reason"] = finish_reason
 
-        usage_metadata : GenerateContentResponseUsageMetadata|None = gcr.usage_metadata
+        usage_metadata: GenerateContentResponseUsageMetadata | None = gcr.usage_metadata
         if usage_metadata:
-            response['prompt_tokens'] = usage_metadata.prompt_token_count
-            response['output_tokens'] = usage_metadata.candidates_token_count
-            response['total_tokens'] = usage_metadata.total_token_count
+            response["prompt_tokens"] = usage_metadata.prompt_token_count
+            response["output_tokens"] = usage_metadata.candidates_token_count
+            response["total_tokens"] = usage_metadata.total_token_count
 
         if not candidate or not candidate.content or not candidate.content.parts:
-            raise TranslationResponseError(_("Gemini response has no valid content parts"), response=candidate)
+            raise TranslationResponseError(
+                _("Gemini response has no valid content parts"), response=candidate
+            )
 
-        response_text = "\n".join(part.text for part in candidate.content.parts if part.text)
+        response_text = "\n".join(
+            part.text for part in candidate.content.parts if part.text
+        )
 
         if not response_text:
-            raise TranslationResponseError(_("Gemini response is empty"), response=candidate)
+            raise TranslationResponseError(
+                _("Gemini response is empty"), response=candidate
+            )
 
-        response['text'] = response_text
+        response["text"] = response_text
 
-        thoughts = "\n".join(part.text for part in candidate.content.parts if part.thought and part.text)
+        thoughts = "\n".join(
+            part.text for part in candidate.content.parts if part.thought and part.text
+        )
         if thoughts:
-            response['reasoning'] = thoughts
+            response["reasoning"] = thoughts
 
         return response
 
     def _create_client(self):
         if self.use_vertex:
             if not self.vertex_project or not self.vertex_location:
-                raise TranslationImpossibleError(_("Vertex AI project and location must be provided"))
+                raise TranslationImpossibleError(
+                    _("Vertex AI project and location must be provided")
+                )
 
-            return genai.Client(vertexai=True, project=self.vertex_project, location=self.vertex_location)
+            return genai.Client(
+                vertexai=True,
+                project=self.vertex_project,
+                location=self.vertex_location,
+            )
 
         if not self.api_key:
             raise TranslationImpossibleError(_("API Key is required"))
 
-        return genai.Client(api_key=self.api_key, http_options={'api_version': 'v1alpha'})
+        return genai.Client(
+            api_key=self.api_key, http_options={"api_version": "v1alpha"}
+        )
 
     def _extract_block_info(self, gcr: GenerateContentResponse) -> str:
         """
@@ -313,36 +394,44 @@ class GeminiClient(TranslationClient):
         """
         info_parts = []
         has_additional_info = False
-        
+
         if gcr.prompt_feedback and gcr.prompt_feedback.block_reason:
             block_reason = gcr.prompt_feedback.block_reason
-            reason_name = getattr(block_reason, 'name', str(block_reason))
+            reason_name = getattr(block_reason, "name", str(block_reason))
             info_parts.append(f"Reason: {reason_name}")
-            
+
             # Add block reason message if available
             if gcr.prompt_feedback.block_reason_message:
-                info_parts.append(f"Message: {gcr.prompt_feedback.block_reason_message}")
+                info_parts.append(
+                    f"Message: {gcr.prompt_feedback.block_reason_message}"
+                )
                 has_additional_info = True
-        
+
         # Add safety ratings if available
         if gcr.prompt_feedback and gcr.prompt_feedback.safety_ratings:
             safety_info = []
             for rating in gcr.prompt_feedback.safety_ratings:
-                category = getattr(rating, 'category', 'Unknown')
-                probability = getattr(rating, 'probability', 'Unknown')
-                blocked = getattr(rating, 'blocked', False)
-                
+                category = getattr(rating, "category", "Unknown")
+                probability = getattr(rating, "probability", "Unknown")
+                blocked = getattr(rating, "blocked", False)
+
                 rating_str = f"{getattr(category, 'name', str(category))}={getattr(probability, 'name', str(probability))}"
                 if blocked:
                     rating_str += " (BLOCKED)"
                 safety_info.append(rating_str)
-            
+
             if safety_info:
                 info_parts.append(f"Safety: {', '.join(safety_info)}")
                 has_additional_info = True
-        
+
         # If it's just PROHIBITED_CONTENT with no additional details, add explanation
-        if not has_additional_info and len(info_parts) == 1 and "PROHIBITED_CONTENT" in info_parts[0]:
-            info_parts.append("Google content policy violation (copyright or censorship). Try another provider.")
-        
+        if (
+            not has_additional_info
+            and len(info_parts) == 1
+            and "PROHIBITED_CONTENT" in info_parts[0]
+        ):
+            info_parts.append(
+                "Google content policy violation (copyright or censorship). Try another provider."
+            )
+
         return "; ".join(info_parts) if info_parts else "Unknown blocking reason"

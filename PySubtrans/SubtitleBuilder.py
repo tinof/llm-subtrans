@@ -11,14 +11,18 @@ from PySubtrans.SubtitleBatcher import SubtitleBatcher
 from PySubtrans.SubtitleLine import SubtitleLine
 
 
-LineData : TypeAlias = tuple[timedelta|str, timedelta|str, str] | tuple[timedelta|str, timedelta|str, str, dict[str, Any]]
+LineData: TypeAlias = (
+    tuple[timedelta | str, timedelta | str, str]
+    | tuple[timedelta | str, timedelta | str, str, dict[str, Any]]
+)
+
 
 class SubtitleBuilder:
     """
     A helper class for programmatically building subtitle structures with fine-grained control.
 
-    Provides a fluent API for preparing subtitles for translation. 
-    
+    Provides a fluent API for preparing subtitles for translation.
+
     Scenes will be automatically divided into batches using gap lengths to determine split points.
 
     Usage:
@@ -34,7 +38,8 @@ class SubtitleBuilder:
     ...     .Build()
     ... )
     """
-    def __init__(self, max_batch_size : int = 100, min_batch_size : int = 1):
+
+    def __init__(self, max_batch_size: int = 100, min_batch_size: int = 1):
         """
         Initialize SubtitleBuilder.
 
@@ -45,17 +50,19 @@ class SubtitleBuilder:
         min_batch_size : int
             Minimum size hint for batches. Helps avoid very small batches.
         """
-        self._scenes : list[SubtitleScene] = []
-        self._current_scene : SubtitleScene|None = None
-        self._current_line_number : int = 0
-        self._accumulated_lines : list[SubtitleLine] = []
-        batch_settings : SettingsType = SettingsType({
-            'max_batch_size': max_batch_size,
-            'min_batch_size': min_batch_size,
-        })
-        self._batcher : SubtitleBatcher = SubtitleBatcher(batch_settings)
+        self._scenes: list[SubtitleScene] = []
+        self._current_scene: SubtitleScene | None = None
+        self._current_line_number: int = 0
+        self._accumulated_lines: list[SubtitleLine] = []
+        batch_settings: SettingsType = SettingsType(
+            {
+                "max_batch_size": max_batch_size,
+                "min_batch_size": min_batch_size,
+            }
+        )
+        self._batcher: SubtitleBatcher = SubtitleBatcher(batch_settings)
 
-    def AddScene(self, summary : str|None = None) -> 'SubtitleBuilder':
+    def AddScene(self, summary: str | None = None) -> "SubtitleBuilder":
         """
         Add a new scene. Lines added after this will be automatically organized into batches.
 
@@ -74,16 +81,16 @@ class SubtitleBuilder:
 
         scene_number = len(self._scenes) + 1
 
-        self._current_scene = SubtitleScene({'number': scene_number})
+        self._current_scene = SubtitleScene({"number": scene_number})
         if summary:
-            self._current_scene.context['summary'] = summary
+            self._current_scene.context["summary"] = summary
 
         self._scenes.append(self._current_scene)
         self._accumulated_lines = []
 
         return self
 
-    def AddLine(self, line : SubtitleLine) -> 'SubtitleBuilder':
+    def AddLine(self, line: SubtitleLine) -> "SubtitleBuilder":
         """
         Add a SubtitleLine to the current scene.
 
@@ -104,7 +111,13 @@ class SubtitleBuilder:
 
         return self
 
-    def BuildLine(self, start : timedelta|str, end : timedelta|str, text : str, metadata : dict[str, Any]|None = None) -> 'SubtitleBuilder':
+    def BuildLine(
+        self,
+        start: timedelta | str,
+        end: timedelta | str,
+        text: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> "SubtitleBuilder":
         """
         Build a SubtitleLine from parameters and add it to the current scene.
 
@@ -125,13 +138,17 @@ class SubtitleBuilder:
             Returns self for method chaining.
         """
         self._current_line_number += 1
-        line : SubtitleLine = SubtitleLine.Construct(self._current_line_number, start, end, text, metadata)
+        line: SubtitleLine = SubtitleLine.Construct(
+            self._current_line_number, start, end, text, metadata
+        )
 
         return self.AddLine(line)
 
-    def AddLines(self, lines : Sequence[SubtitleLine] | Sequence[LineData]) -> 'SubtitleBuilder':
+    def AddLines(
+        self, lines: Sequence[SubtitleLine] | Sequence[LineData]
+    ) -> "SubtitleBuilder":
         """
-        Add multiple subtitle lines to the current scene. 
+        Add multiple subtitle lines to the current scene.
 
         Parameters
         ----------
@@ -183,26 +200,32 @@ class SubtitleBuilder:
         if not self._current_scene or not self._accumulated_lines:
             return
 
-        line_numbers : list[int] = []
+        line_numbers: list[int] = []
         for line in self._accumulated_lines:
             if line.number is None:
                 raise ValueError("Subtitle lines must have a number before batching")
             line_numbers.append(line.number)
 
-        duplicates = [str(number) for number, count in Counter(line_numbers).items() if count > 1]
+        duplicates = [
+            str(number) for number, count in Counter(line_numbers).items() if count > 1
+        ]
         if duplicates:
-            duplicate_list = ', '.join(sorted(duplicates, key=int))
-            raise ValueError(f"Duplicate line numbers detected in scene {self._current_scene.number}: {duplicate_list}")
+            duplicate_list = ", ".join(sorted(duplicates, key=int))
+            raise ValueError(
+                f"Duplicate line numbers detected in scene {self._current_scene.number}: {duplicate_list}"
+            )
 
         self._accumulated_lines.sort(key=lambda line: line.number)
 
         # Use batcher's subdivision logic
-        split_line_groups : list[list[SubtitleLine]] = self._batcher._split_lines(self._accumulated_lines)
+        split_line_groups: list[list[SubtitleLine]] = self._batcher._split_lines(
+            self._accumulated_lines
+        )
 
         for i, line_group in enumerate(split_line_groups):
-            batch_data : dict[str, Any] = {
-                'scene': self._current_scene.number,
-                'number': i + 1
+            batch_data: dict[str, Any] = {
+                "scene": self._current_scene.number,
+                "number": i + 1,
             }
 
             batch = SubtitleBatch(batch_data)

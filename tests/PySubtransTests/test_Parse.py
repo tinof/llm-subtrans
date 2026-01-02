@@ -20,7 +20,9 @@ class TestParseDelayFromHeader(LoggedTestCase):
         for value, expected in self.test_cases:
             with self.subTest(value=value):
                 result = ParseDelayFromHeader(value)
-                self.assertLoggedEqual(f"delay parsed from {value}", expected, result, input_value=value)
+                self.assertLoggedEqual(
+                    f"delay parsed from {value}", expected, result, input_value=value
+                )
 
 
 class TestParseNames(LoggedTestCase):
@@ -29,8 +31,8 @@ class TestParseNames(LoggedTestCase):
         (["John", "Jane", "Alice"], ["John", "Jane", "Alice"]),
         ("Mike, Murray, Mabel, Marge", ["Mike", "Murray", "Mabel", "Marge"]),
         ("", []),
-        ([] , []),
-        ([""], [])
+        ([], []),
+        ([""], []),
     ]
 
     def test_ParseNames(self):
@@ -43,6 +45,7 @@ class TestParseNames(LoggedTestCase):
                     result,
                     input_value=value,
                 )
+
 
 class TestParseValues(LoggedTestCase):
     class TestEnum(Enum):
@@ -65,21 +68,33 @@ class TestParseValues(LoggedTestCase):
         (TestEnum.Test2, "Test2"),
         (TestEnum.TestValue, "Test Value"),
         (TestEnum.TestExample, "Test Example"),
-        (TestObject("Test Object"), "Test Object")
+        (TestObject("Test Object"), "Test Object"),
     ]
 
     def test_GetValueName(self):
         for value, expected in self.get_value_name_cases:
             with self.subTest(value=value):
                 result = GetValueName(value)
-                self.assertLoggedEqual(f"name for {value}", expected, result, input_value=value)
+                self.assertLoggedEqual(
+                    f"name for {value}", expected, result, input_value=value
+                )
 
     get_value_from_name_cases = [
-        ("Test Name", ["Test Name", "Another Name", "Yet Another Name"], None, "Test Name"),
-        ("Nonexistent Name", ["Test Name", "Another Name", "Yet Another Name"], "Default Value", "Default Value"),
+        (
+            "Test Name",
+            ["Test Name", "Another Name", "Yet Another Name"],
+            None,
+            "Test Name",
+        ),
+        (
+            "Nonexistent Name",
+            ["Test Name", "Another Name", "Yet Another Name"],
+            "Default Value",
+            "Default Value",
+        ),
         (34567, [12345, 34567, 98765], None, 34567),
         ("12345", [12345, 34567, 98765], None, 12345),
-        ("Test2", TestEnum, None, TestEnum.Test2)
+        ("Test2", TestEnum, None, TestEnum.Test2),
     ]
 
     def test_GetValueFromName(self):
@@ -93,5 +108,6 @@ class TestParseValues(LoggedTestCase):
                     input_value=(value, names, default),
                 )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

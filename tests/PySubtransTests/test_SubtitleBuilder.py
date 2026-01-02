@@ -8,7 +8,6 @@ from PySubtrans.Helpers.TestCases import LoggedTestCase
 
 
 class TestSubtitleBuilder(LoggedTestCase):
-
     def setUp(self):
         """Set up test cases."""
         super().setUp()
@@ -41,7 +40,9 @@ class TestSubtitleBuilder(LoggedTestCase):
         """Test that batches are created automatically when scene is finalized."""
         builder = SubtitleBuilder()
         builder.AddScene()
-        result = builder.BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Test line")
+        result = builder.BuildLine(
+            timedelta(seconds=1), timedelta(seconds=3), "Test line"
+        )
 
         self.assertLoggedIsInstance("AddLine return type", result, SubtitleBuilder)
 
@@ -69,7 +70,9 @@ class TestSubtitleBuilder(LoggedTestCase):
         builder = SubtitleBuilder()
         builder.AddScene()
 
-        result = builder.BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Test line")
+        result = builder.BuildLine(
+            timedelta(seconds=1), timedelta(seconds=3), "Test line"
+        )
 
         self.assertLoggedIsInstance("AddLine return type", result, SubtitleBuilder)
 
@@ -93,8 +96,12 @@ class TestSubtitleBuilder(LoggedTestCase):
         builder.AddScene()
 
         lines = [
-            SubtitleLine.Construct(1, timedelta(seconds=1), timedelta(seconds=3), "Line 1"),
-            SubtitleLine.Construct(2, timedelta(seconds=4), timedelta(seconds=6), "Line 2")
+            SubtitleLine.Construct(
+                1, timedelta(seconds=1), timedelta(seconds=3), "Line 1"
+            ),
+            SubtitleLine.Construct(
+                2, timedelta(seconds=4), timedelta(seconds=6), "Line 2"
+            ),
         ]
 
         result = builder.AddLines(lines)
@@ -113,7 +120,7 @@ class TestSubtitleBuilder(LoggedTestCase):
 
         lines = [
             (timedelta(seconds=1), timedelta(seconds=3), "Line 1"),
-            (timedelta(seconds=4), timedelta(seconds=6), "Line 2")
+            (timedelta(seconds=4), timedelta(seconds=6), "Line 2"),
         ]
 
         builder.AddLines(lines)
@@ -129,21 +136,25 @@ class TestSubtitleBuilder(LoggedTestCase):
         """Test creating multiple scenes and batches."""
         builder = SubtitleBuilder()
 
-        (builder
-         .AddScene(summary="Scene 1")
-         .BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Line 1")
-         .BuildLine(timedelta(seconds=4), timedelta(seconds=6), "Line 2")
-         .AddScene(summary="Scene 2")
-         .BuildLine(timedelta(seconds=65), timedelta(seconds=67), "Line 3")
+        (
+            builder.AddScene(summary="Scene 1")
+            .BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Line 1")
+            .BuildLine(timedelta(seconds=4), timedelta(seconds=6), "Line 2")
+            .AddScene(summary="Scene 2")
+            .BuildLine(timedelta(seconds=65), timedelta(seconds=67), "Line 3")
         )
 
         # Finalize to create batches
         subtitles = builder.Build()
         self.assertLoggedEqual("scenes count", 2, len(subtitles.scenes))
 
-        self.assertLoggedEqual("scene 1 batches count", 1, len(subtitles.scenes[0].batches))
+        self.assertLoggedEqual(
+            "scene 1 batches count", 1, len(subtitles.scenes[0].batches)
+        )
 
-        self.assertLoggedEqual("scene 2 batches count", 1, len(subtitles.scenes[1].batches))
+        self.assertLoggedEqual(
+            "scene 2 batches count", 1, len(subtitles.scenes[1].batches)
+        )
 
     def test_automatic_batch_splitting(self):
         """Test that batches are automatically split when they exceed max_batch_size."""
@@ -152,7 +163,9 @@ class TestSubtitleBuilder(LoggedTestCase):
 
         # Add many lines to trigger automatic batch splitting
         for i in range(1, 11):  # 10 lines
-            builder.BuildLine(timedelta(seconds=i), timedelta(seconds=i+1), f"Line {i}")
+            builder.BuildLine(
+                timedelta(seconds=i), timedelta(seconds=i + 1), f"Line {i}"
+            )
 
         # Batching happens when scene is finalized
         subtitles = builder.Build()
@@ -176,7 +189,9 @@ class TestSubtitleBuilder(LoggedTestCase):
 
         # Add few lines that don't exceed max_batch_size
         for i in range(1, 6):  # 5 lines
-            builder.BuildLine(timedelta(seconds=i), timedelta(seconds=i+1), f"Line {i}")
+            builder.BuildLine(
+                timedelta(seconds=i), timedelta(seconds=i + 1), f"Line {i}"
+            )
 
         # Batching happens when scene is finalized
         subtitles = builder.Build()
@@ -190,10 +205,10 @@ class TestSubtitleBuilder(LoggedTestCase):
         """Test that Build() properly finalizes the subtitles structure."""
         builder = SubtitleBuilder()
 
-        subtitles = (builder
-                    .AddScene()
-                    .BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Test line")
-                    .Build()
+        subtitles = (
+            builder.AddScene()
+            .BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Test line")
+            .Build()
         )
 
         self.assertLoggedIsInstance("built subtitles type", subtitles, Subtitles)
@@ -209,10 +224,10 @@ class TestSubtitleBuilder(LoggedTestCase):
         builder = SubtitleBuilder()
 
         # Test that all methods return SubtitleBuilder for chaining
-        result = (builder
-                 .AddScene(summary="Test scene")
-                 .BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Hello")
-                 .BuildLine(timedelta(seconds=4), timedelta(seconds=6), "World")
+        result = (
+            builder.AddScene(summary="Test scene")
+            .BuildLine(timedelta(seconds=1), timedelta(seconds=3), "Hello")
+            .BuildLine(timedelta(seconds=4), timedelta(seconds=6), "World")
         )
 
         self.assertLoggedIsInstance("fluent API result type", result, SubtitleBuilder)
@@ -252,16 +267,20 @@ class TestSubtitleBuilder(LoggedTestCase):
         metadata2 = {"speaker": "Bob", "volume": "loud"}
         lines = [
             (timedelta(seconds=1), timedelta(seconds=3), "Line 1", metadata1),
-            (timedelta(seconds=4), timedelta(seconds=6), "Line 2", metadata2)
+            (timedelta(seconds=4), timedelta(seconds=6), "Line 2", metadata2),
         ]
 
         builder.AddLines(lines)
         subtitles = builder.Build()
         batch = subtitles.scenes[0].batches[0]
 
-        self.assertLoggedEqual("first line metadata", metadata1, batch.originals[0].metadata)
+        self.assertLoggedEqual(
+            "first line metadata", metadata1, batch.originals[0].metadata
+        )
 
-        self.assertLoggedEqual("second line metadata", metadata2, batch.originals[1].metadata)
+        self.assertLoggedEqual(
+            "second line metadata", metadata2, batch.originals[1].metadata
+        )
 
     def test_edge_case_batch_sizes(self):
         """Test builder with edge case batch sizes."""
@@ -272,15 +291,18 @@ class TestSubtitleBuilder(LoggedTestCase):
         subtitles = builder.Build()
         scene = subtitles.scenes[0]
 
-        self.assertLoggedGreaterEqual("batches count with max_batch_size=1", len(scene.batches), 2)
+        self.assertLoggedGreaterEqual(
+            "batches count with max_batch_size=1", len(scene.batches), 2
+        )
 
         # Each batch should have at most 1 line
         for i, batch in enumerate(scene.batches):
             self.assertLoggedLessEqual(
-                f"batch {i+1} size",
+                f"batch {i + 1} size",
                 len(batch.originals),
                 1,
             )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

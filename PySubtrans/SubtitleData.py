@@ -16,10 +16,14 @@ class SubtitleData:
         detected_format (str|None): Optional detected file format/extension (e.g. '.srt')
     """
 
-    def __init__(self, lines : list[SubtitleLine]|None = None, metadata : dict[str, Any]|None = None, start_line_number : int|None = None, detected_format : str|None = None
+    def __init__(
+        self,
+        lines: list[SubtitleLine] | None = None,
+        metadata: dict[str, Any] | None = None,
+        start_line_number: int | None = None,
+        detected_format: str | None = None,
     ):
-        self.lines : list[SubtitleLine] = lines or []
-        self.metadata : dict[str, Any] = metadata or {}
-        self.start_line_number : int|None = start_line_number
-        self.detected_format : str|None = detected_format
-
+        self.lines: list[SubtitleLine] = lines or []
+        self.metadata: dict[str, Any] = metadata or {}
+        self.start_line_number: int | None = start_line_number
+        self.detected_format: str | None = detected_format

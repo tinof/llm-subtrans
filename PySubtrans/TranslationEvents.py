@@ -5,9 +5,10 @@ from typing import Protocol
 
 class LoggerProtocol(Protocol):
     """Protocol for objects that can be used as loggers"""
-    def error(self, msg : object, *args, **kwargs) -> None: ...
-    def warning(self, msg : object, *args, **kwargs) -> None: ...
-    def info(self, msg : object, *args, **kwargs) -> None: ...
+
+    def error(self, msg: object, *args, **kwargs) -> None: ...
+    def warning(self, msg: object, *args, **kwargs) -> None: ...
+    def info(self, msg: object, *args, **kwargs) -> None: ...
 
 
 class TranslationEvents:
@@ -18,27 +19,28 @@ class TranslationEvents:
     e.g. to provide progress feedback or UI updates.
 
     Signals:
-        batch_translated(sender, batch): 
+        batch_translated(sender, batch):
             Emitted after each batch is translated
 
-        batch_updated(sender, batch): 
+        batch_updated(sender, batch):
             Emitted after each batch is updated in the subtitle project
 
-        scene_translated(sender, scene): 
+        scene_translated(sender, scene):
             Emitted when a complete scene has been translated
 
         preprocessed(sender, scenes):
             Emitted after subtitles are batched and pre-processed
 
-        error(sender, message): 
+        error(sender, message):
             Signals that an error was encountered during translation
 
-        warning(sender, message): 
+        warning(sender, message):
             Signals that a warning was encountered during translation
 
-        info(sender, message): 
+        info(sender, message):
             General informational message during translation
     """
+
     preprocessed: Signal
     batch_translated: Signal
     batch_updated: Signal
@@ -79,13 +81,14 @@ class TranslationEvents:
         self.warning.disconnect(self._default_warning_wrapper)
         self.info.disconnect(self._default_info_wrapper)
 
-    def connect_logger(self, logger : LoggerProtocol):
+    def connect_logger(self, logger: LoggerProtocol):
         """
         Connect a custom logger to the logging signals.
 
         Args:
             logger: A logger-like object with error, warning, and info methods
         """
+
         # Create wrapper functions to adapt signal kwargs to logger positional args
         def error_wrapper(sender, message):
             logger.error(message)

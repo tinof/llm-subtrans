@@ -24,6 +24,7 @@ translator.TranslateSubtitles(subs)
 # Save translated subtitles
 subs.SaveSubtitles("movie_translated.srt")
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -59,17 +60,17 @@ def init_options(**settings: SettingType) -> Options:
         Valid settings depend on the chosen provider and likely include, e.g.
 
         provider = "OpenAI",
-        model = "gpt-5-mini", 
-        api_key = "sk-...", 
+        model = "gpt-5-mini",
+        api_key = "sk-...",
 
         Additional settings can be provided to customise the translation flow, e.g.
 
-        prompt = "Translate these subtitles into [target_language]", 
+        prompt = "Translate these subtitles into [target_language]",
         target_language = "French",
         instruction_file = "instructions.txt",
         postprocess_translation = True
 
-        See :class:`Options` for available settings. 
+        See :class:`Options` for available settings.
         Options that are not specified will be assigned default values.
 
     Returns
@@ -86,12 +87,12 @@ def init_options(**settings: SettingType) -> Options:
     options = Options(settings)
 
     # Load and apply instructions if instruction file is specified
-    instruction_file = options.get_str('instruction_file')
+    instruction_file = options.get_str("instruction_file")
     if instruction_file:
         instructions = LoadInstructions(instruction_file)
 
         # Override prompt with explicit value if provided
-        prompt = settings.get_str('prompt')
+        prompt = settings.get_str("prompt")
         if prompt:
             instructions.prompt = prompt
 
@@ -99,11 +100,12 @@ def init_options(**settings: SettingType) -> Options:
 
     return options
 
+
 def init_subtitles(
-    filepath: str|None = None,
-    content: str|None = None,
+    filepath: str | None = None,
+    content: str | None = None,
     *,
-    options: Options|SettingsType|None = None,
+    options: Options | SettingsType | None = None,
     auto_batch: bool = True,
 ) -> Subtitles:
     """
@@ -138,7 +140,9 @@ def init_subtitles(
     subs = init_subtitles(content=srt_content)
     """
     if filepath and content:
-        raise SubtitleError("Only one of 'filepath' or 'content' should be provided, not both.")
+        raise SubtitleError(
+            "Only one of 'filepath' or 'content' should be provided, not both."
+        )
 
     if filepath:
         subtitles = Subtitles(filepath)
@@ -156,23 +160,24 @@ def init_subtitles(
 
     options = Options(options)
 
-    if options.get_bool('preprocess_subtitles'):
+    if options.get_bool("preprocess_subtitles"):
         preprocess_subtitles(subtitles, options)
 
     if auto_batch:
         batch_subtitles(
             subtitles,
-            scene_threshold=options.get_float('scene_threshold') or 60.0,
-            min_batch_size=options.get_int('min_batch_size') or 1,
-            max_batch_size=options.get_int('max_batch_size') or 100,
-            prevent_overlap=options.get_bool('prevent_overlapping_times'),
+            scene_threshold=options.get_float("scene_threshold") or 60.0,
+            min_batch_size=options.get_int("min_batch_size") or 1,
+            max_batch_size=options.get_int("max_batch_size") or 100,
+            prevent_overlap=options.get_bool("prevent_overlapping_times"),
         )
 
     return subtitles
 
+
 def init_translation_provider(
-    provider : str,
-    options : Options|SettingsType|Mapping[str, SettingType],
+    provider: str,
+    options: Options | SettingsType | Mapping[str, SettingType],
 ) -> TranslationProvider:
     """
     Initialise and validate a :class:`TranslationProvider` instance.
@@ -219,15 +224,18 @@ def init_translation_provider(
         raise SubtitleError(str(exc)) from exc
 
     if not translation_provider.ValidateSettings():
-        message = translation_provider.validation_message or f"Invalid settings for provider {provider}"
+        message = (
+            translation_provider.validation_message
+            or f"Invalid settings for provider {provider}"
+        )
         raise SubtitleError(message)
 
     return translation_provider
 
 
 def init_translator(
-    settings : Options|SettingsType,
-    translation_provider : TranslationProvider|None = None,
+    settings: Options | SettingsType,
+    translation_provider: TranslationProvider | None = None,
 ) -> SubtitleTranslator:
     """
     Return a ready-to-use :class:`SubtitleTranslator` using the specified settings.
@@ -266,10 +274,15 @@ def init_translator(
     """
     options = Options(settings)
 
-    translation_provider = translation_provider or TranslationProvider.get_provider(options)
+    translation_provider = translation_provider or TranslationProvider.get_provider(
+        options
+    )
 
     if not translation_provider.ValidateSettings():
-        message = translation_provider.validation_message or f"Invalid settings for provider {options.provider}"
+        message = (
+            translation_provider.validation_message
+            or f"Invalid settings for provider {options.provider}"
+        )
         raise SubtitleError(message)
 
     options.provider = translation_provider.name
@@ -278,9 +291,9 @@ def init_translator(
 
 
 def init_project(
-    settings: Options|SettingsType|None = None,
+    settings: Options | SettingsType | None = None,
     *,
-    filepath: str|None = None,
+    filepath: str | None = None,
     persistent: bool = False,
     auto_batch: bool = True,
 ) -> SubtitleProject:
@@ -345,16 +358,16 @@ def init_project(
         if not subtitles or not subtitles.originals:
             raise SubtitleError(f"No subtitles were loaded from '{normalised_path}'")
 
-        if options.get_bool('preprocess_subtitles'):
+        if options.get_bool("preprocess_subtitles"):
             preprocess_subtitles(subtitles, options)
 
         if auto_batch:
             batch_subtitles(
                 subtitles,
-                scene_threshold=options.get_float('scene_threshold') or 60.0,
-                min_batch_size=options.get_int('min_batch_size') or 1,
-                max_batch_size=options.get_int('max_batch_size') or 100,
-                prevent_overlap=options.get_bool('prevent_overlapping_times'),
+                scene_threshold=options.get_float("scene_threshold") or 60.0,
+                min_batch_size=options.get_int("min_batch_size") or 1,
+                max_batch_size=options.get_int("max_batch_size") or 100,
+                prevent_overlap=options.get_bool("prevent_overlapping_times"),
             )
 
     return project
@@ -362,7 +375,7 @@ def init_project(
 
 def preprocess_subtitles(
     subtitles: Subtitles,
-    settings: Options|SettingsType|None = None,
+    settings: Options | SettingsType | None = None,
 ) -> None:
     """
     Preprocess subtitles to fix common issues before translation.
@@ -384,6 +397,7 @@ def preprocess_subtitles(
     preprocessor = SubtitleProcessor(settings or Options())
     with SubtitleEditor(subtitles) as editor:
         editor.PreProcess(preprocessor)
+
 
 def batch_subtitles(
     subtitles: Subtitles,
@@ -420,12 +434,16 @@ def batch_subtitles(
     if not subtitles.originals:
         raise SubtitleError("No subtitle lines available to batch")
 
-    batcher = SubtitleBatcher(SettingsType({
-        'scene_threshold': scene_threshold,
-        'min_batch_size': min_batch_size,
-        'max_batch_size': max_batch_size,
-        'prevent_overlapping_times': prevent_overlap,
-    }))
+    batcher = SubtitleBatcher(
+        SettingsType(
+            {
+                "scene_threshold": scene_threshold,
+                "min_batch_size": min_batch_size,
+                "max_batch_size": max_batch_size,
+                "prevent_overlapping_times": prevent_overlap,
+            }
+        )
+    )
 
     with SubtitleEditor(subtitles) as editor:
         editor.AutoBatch(batcher)
@@ -434,25 +452,25 @@ def batch_subtitles(
 
 
 __all__ = [
-    '__version__',
-    'Options',
-    'SettingsType',
-    'Subtitles',
-    'SubtitleScene',
-    'SubtitleLine',
-    'SubtitleBatcher',
-    'SubtitleBuilder',
-    'SubtitleEditor',
-    'SubtitleFormatRegistry',
-    'SubtitleProcessor',
-    'SubtitleProject',
-    'SubtitleTranslator',
-    'TranslationProvider',
-    'init_options',
-    'batch_subtitles',
-    'init_project',
-    'init_subtitles',
-    'init_translation_provider',
-    'init_translator',
-    'preprocess_subtitles',
+    "__version__",
+    "Options",
+    "SettingsType",
+    "Subtitles",
+    "SubtitleScene",
+    "SubtitleLine",
+    "SubtitleBatcher",
+    "SubtitleBuilder",
+    "SubtitleEditor",
+    "SubtitleFormatRegistry",
+    "SubtitleProcessor",
+    "SubtitleProject",
+    "SubtitleTranslator",
+    "TranslationProvider",
+    "init_options",
+    "batch_subtitles",
+    "init_project",
+    "init_subtitles",
+    "init_translation_provider",
+    "init_translator",
+    "preprocess_subtitles",
 ]

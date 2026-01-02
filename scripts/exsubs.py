@@ -43,13 +43,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("exsubs")
 
-GEMINI_DEFAULT_MODEL = "gemini-2.5-pro"
+GEMINI_DEFAULT_MODEL = "gemini-3.0-flash-001"
 GEMINI_SCENE_THRESHOLD = 240.0
 GEMINI_MIN_BATCH_SIZE = 80
 GEMINI_MAX_BATCH_SIZE = 180
 GEMINI_STANDARD_RATE_LIMIT = 150.0
 GEMINI_FLASH_RATE_LIMIT = 1000.0
-GEMINI_FLASH_MODEL_SUFFIX = "gemini-2.5-flash-preview-09-2025"
+GEMINI_FLASH_MODEL_SUFFIX = "flash"
 GEMINI_MAX_CONTEXT_SUMMARIES = 6
 
 # Flash preview tuned defaults
@@ -321,7 +321,7 @@ def _normalise_model_name(model: str | None) -> str | None:
 
 def _determine_gemini_rate_limit(model: str | None) -> float:
     normalised = _normalise_model_name(model)
-    if normalised == GEMINI_FLASH_MODEL_SUFFIX:
+    if normalised and GEMINI_FLASH_MODEL_SUFFIX in normalised:
         return GEMINI_FLASH_RATE_LIMIT
     return GEMINI_STANDARD_RATE_LIMIT
 
@@ -543,6 +543,10 @@ def process_video_file(
     show_progress: bool,
     show_metrics: bool = True,
     copy_local: bool = False,
+    parallel_batches: bool = False,
+    parallel_workers: int = 4,
+    max_batch_size: int | None = None,
+    min_batch_size: int | None = None,
 ):
     """Process a single video file - extract and translate subtitles"""
     logger.info(f"Processing {video_file}")
@@ -620,6 +624,10 @@ def process_video_file(
             mode,
             show_progress=show_progress,
             show_metrics=show_metrics,
+            parallel_batches=parallel_batches,
+            parallel_workers=parallel_workers,
+            max_batch_size_arg=max_batch_size,
+            min_batch_size_arg=min_batch_size,
         )
 
         translated_file = _normalise_translated_output(
@@ -686,6 +694,10 @@ def translate_subtitles(
     mode: TranslationMode,
     show_progress: bool = True,
     show_metrics: bool = True,
+    parallel_batches: bool = False,
+    parallel_workers: int = 4,
+    max_batch_size_arg: int | None = None,
+    min_batch_size_arg: int | None = None,
 ):
     """Translate subtitles using PySubtrans API"""
     from PySubtrans.MKV.Config import MODE_TO_DEFAULT_MODEL, MODE_TO_RATE_LIMIT
@@ -704,6 +716,20 @@ def translate_subtitles(
     scene_threshold = float(os.getenv("SCENE_THRESHOLD") or 60.0)
     min_batch_size = int(os.getenv("MIN_BATCH_SIZE") or 10)
     max_batch_size = int(os.getenv("MAX_BATCH_SIZE") or 50)
+
+    # Logic: Arg > Env > Parallel-Default > Default
+
+    # 1. Override with arguments if provided
+    if min_batch_size_arg:
+        min_batch_size = min_batch_size_arg
+    if max_batch_size_arg:
+        max_batch_size = max_batch_size_arg
+
+    # 2. If Parallel Mode is on and no explicit max_batch_size (arg or env), optimize for parallelism
+    # Check if user set env var explicitly to avoid overriding their preference
+    if parallel_batches and not max_batch_size_arg and not os.getenv("MAX_BATCH_SIZE"):
+        # Default to smaller batches for parallel mode to utilize workers
+        max_batch_size = 200
     max_context_summaries = int(os.getenv("MAX_CONTEXT_SUMMARIES") or 10)
     rate_limit: float | None = None
 
@@ -722,7 +748,7 @@ def translate_subtitles(
         # Only apply if large_context_mode is NOT enabled, as it has its own defaults in SubtitleBatcher
         if not large_context_mode:
             normalised = _normalise_model_name(model)
-            if normalised == GEMINI_FLASH_MODEL_SUFFIX:
+            if normalised and GEMINI_FLASH_MODEL_SUFFIX in normalised:
                 scene_threshold = float(
                     os.getenv("SCENE_THRESHOLD") or FLASH_SCENE_THRESHOLD
                 )
@@ -822,6 +848,8 @@ def translate_subtitles(
         "max_batch_size": max_batch_size,
         "max_context_summaries": max_context_summaries,
         "large_context_mode": large_context_mode,
+        "parallel_batches": parallel_batches,
+        "max_parallel_workers": parallel_workers,
     }
 
     if rate_limit:
@@ -908,6 +936,10 @@ def process_directory(
     interactive: bool,
     show_progress: bool,
     copy_local: bool = False,
+    parallel_batches: bool = False,
+    parallel_workers: int = 4,
+    max_batch_size: int | None = None,
+    min_batch_size: int | None = None,
 ):
     """Process all MKV files in the current directory"""
     # Get all MKV files and sort them
@@ -947,7 +979,12 @@ def process_directory(
                     mode,
                     interactive,
                     show_progress,
+                    show_progress,
                     copy_local=copy_local,
+                    parallel_batches=parallel_batches,
+                    parallel_workers=parallel_workers,
+                    max_batch_size=max_batch_size,
+                    min_batch_size=min_batch_size,
                 )
                 translated_file = _normalise_translated_output(
                     subtitle_file, translated_file, config.target_language, lang_code
@@ -1045,6 +1082,32 @@ def main():
         action="store_true",
         help="Copy MKV file to local temporary directory before processing (useful for network mounts)",
     )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Enable parallel batch translation (faster but disables inter-batch context and streaming)",
+    )
+    parser.add_argument(
+        "--no-parallel",
+        action="store_true",
+        help="Disable parallel batch translation (force sequential mode)",
+    )
+    parser.add_argument(
+        "--parallel-workers",
+        type=int,
+        default=None,
+        help="Number of parallel workers for batch translation (default: 4, or 8 for Gemini 3.0)",
+    )
+    parser.add_argument(
+        "--max-batch-size",
+        type=int,
+        help="Maximum lines per batch (default: 600 for Gemini, 200 for Parallel)",
+    )
+    parser.add_argument(
+        "--min-batch-size",
+        type=int,
+        help="Minimum lines per batch",
+    )
     args = parser.parse_args()
 
     # Load environment variables
@@ -1075,6 +1138,31 @@ def main():
     env_mode = _env_default_mode()
     mode = args.mode or env_mode or config.default_translation_mode
 
+    # Auto-optimize for Gemini 3.0 (Enable parallel by default)
+    if mode == TranslationMode.GEMINI and not args.no_parallel:
+        gemini_model = os.getenv("GEMINI_MODEL") or GEMINI_DEFAULT_MODEL
+        model_lower = gemini_model.lower()
+
+        # Check for Gemini 3.0 models (flash or pro) or explicitly 'flash'
+        is_modern_gemini = "flash" in model_lower or "pro" in model_lower
+
+        # Auto-enable parallel if not explicitly disabled
+        if is_modern_gemini and not args.parallel:
+            args.parallel = True
+
+    # Set defaults for parallel mode if enabled
+    if args.parallel:
+        if args.parallel_workers is None:
+            # Optimize for high-concurrency models (Gemini 3)
+            args.parallel_workers = 8
+        if args.max_batch_size is None:
+            # Optimize for parallel execution (smaller batches)
+            args.max_batch_size = 200
+
+    # Fallback default for workers if not parallel or not set
+    if args.parallel_workers is None:
+        args.parallel_workers = 4
+
     # Verify dependencies
     verify_dependencies()
     verify_api_key(mode)
@@ -1101,11 +1189,23 @@ def main():
                         show_progress,
                         show_metrics,
                         copy_local=args.copy_local,
+                        parallel_batches=args.parallel,
+                        parallel_workers=args.parallel_workers,
+                        max_batch_size=args.max_batch_size,
+                        min_batch_size=args.min_batch_size,
                     )
                 else:
                     # Process all MKV files in current directory
                     process_directory(
-                        config, mode, args.interactive, show_progress, args.copy_local
+                        config,
+                        mode,
+                        args.interactive,
+                        show_progress,
+                        copy_local=args.copy_local,
+                        parallel_batches=args.parallel,
+                        parallel_workers=args.parallel_workers,
+                        max_batch_size=args.max_batch_size,
+                        min_batch_size=args.min_batch_size,
                     )
 
                 return 0

@@ -3,7 +3,6 @@ import functools
 import logging
 import os
 import sys
-import unittest
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +13,7 @@ from PySubtrans.Subtitles import Subtitles
 separator = "".center(60, "-")
 wide_separator = "".center(120, "-")
 
+
 def log_info(text: str, prefix: str = ""):
     """
     Logs a string as individual lines with an optional prefix on each line using logging.info.
@@ -21,12 +21,14 @@ def log_info(text: str, prefix: str = ""):
     for line in text.strip().split("\n"):
         logging.info(f"{prefix}{line}")
 
+
 def log_error(text: str, prefix: str = ""):
     """
     Logs a string as individual lines with an optional prefix on each line using logging.error.
     """
     for line in text.strip().split("\n"):
         logging.error(f"{prefix}{line}")
+
 
 def log_test_name(test_name: str):
     """
@@ -36,7 +38,8 @@ def log_test_name(test_name: str):
     log_info(test_name.center(len(separator)))
     logging.info(separator)
 
-def log_expected_result(expected : Any, result : Any):
+
+def log_expected_result(expected: Any, result: Any):
     """
     Logs the expected result and the actual result.
     """
@@ -46,7 +49,8 @@ def log_expected_result(expected : Any, result : Any):
         log_error("*** UNEXPECTED RESULT! ***", prefix="!!!".ljust(10))
     logging.info(separator)
 
-def log_input_expected_result(input : Any, expected : Any, result : Any):
+
+def log_input_expected_result(input: Any, expected: Any, result: Any):
     """
     Logs the input value, the expected result and the actual result.
     """
@@ -57,7 +61,8 @@ def log_input_expected_result(input : Any, expected : Any, result : Any):
         log_error("*** UNEXPECTED RESULT! ***", prefix="!!!".ljust(10))
     logging.info(separator)
 
-def log_input_expected_error(input : Any, expected_error : type[Exception], result : Any):
+
+def log_input_expected_error(input: Any, expected_error: type[Exception], result: Any):
     """
     Logs the input value, the expected error and the actual error.
     """
@@ -81,6 +86,7 @@ def skip_if_debugger_attached(test_method):
             # Test that raises exceptions
             pass
     """
+
     @functools.wraps(test_method)
     def wrapper(self, *args, **kwargs):
         if sys.gettrace() is not None:
@@ -88,25 +94,31 @@ def skip_if_debugger_attached(test_method):
             logging.info(f"Skipped {test_name} when debugger is attached")
         else:
             return test_method(self, *args, **kwargs)
+
     return wrapper
 
-def create_logfile(results_dir : str, log_name : str, log_level = logging.DEBUG) -> logging.FileHandler:
+
+def create_logfile(
+    results_dir: str, log_name: str, log_level=logging.DEBUG
+) -> logging.FileHandler:
     """
     Creates a log file with the specified name in the specified directory and adds it to the root logger.
     """
     log_path = os.path.join(results_dir, log_name)
-    file_handler = logging.FileHandler(log_path, encoding='utf-8', mode='w')
+    file_handler = logging.FileHandler(log_path, encoding="utf-8", mode="w")
     file_handler.setLevel(log_level)
-    file_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-    logging.getLogger('').addHandler(file_handler)
+    file_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logging.getLogger("").addHandler(file_handler)
     return file_handler
 
-def end_logfile(file_handler : logging.FileHandler):
+
+def end_logfile(file_handler: logging.FileHandler):
     """
     Closes the file handler for the log file.
     """
-    logging.getLogger('').removeHandler(file_handler)
+    logging.getLogger("").removeHandler(file_handler)
     file_handler.close()
+
 
 def _configure_base_logger(results_path, test_name):
     """
@@ -117,27 +129,34 @@ def _configure_base_logger(results_path, test_name):
     logger.setLevel(logging.DEBUG)
 
     test_log_path = os.path.join(results_path, f"{test_name}.log")
-    file_handler = logging.FileHandler(test_log_path, mode='w', encoding='utf-8')
-    file_formatter = logging.Formatter('%(message)s')
+    file_handler = logging.FileHandler(test_log_path, mode="w", encoding="utf-8")
+    file_formatter = logging.Formatter("%(message)s")
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
 
     return logger
 
+
 def _add_test_file_logger(logger, results_path, input_filename, test_name):
     """
     Adds a file handler to log INFO level messages to a specific file named after the input file (without extension) and test name.
     """
-    base_filename, dummy = os.path.splitext(input_filename) # type: ignore[ignore-unused]
+    base_filename, dummy = os.path.splitext(input_filename)  # type: ignore[ignore-unused]
     input_log_path = os.path.join(results_path, f"{base_filename}-{test_name}.log")
-    file_handler = logging.FileHandler(input_log_path, mode='w', encoding='utf-8')
-    file_formatter = logging.Formatter('%(message)s')
+    file_handler = logging.FileHandler(input_log_path, mode="w", encoding="utf-8")
+    file_formatter = logging.Formatter("%(message)s")
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.INFO)
     logger.addHandler(file_handler)
     return file_handler
 
-def RunTestOnAllSubtitleFiles(run_test : Callable, test_options: list[dict], directory_path: str, results_path: str|None = None):
+
+def RunTestOnAllSubtitleFiles(
+    run_test: Callable,
+    test_options: list[dict],
+    directory_path: str,
+    results_path: str | None = None,
+):
     """
     Run a series of tests on all .srt files in the test_subtitles directory.
     """
@@ -166,7 +185,7 @@ def RunTestOnAllSubtitleFiles(run_test : Callable, test_options: list[dict], dir
         )
 
     files = [f for f in os.listdir(directory_path) if _is_supported_subtitle_file(f)]
-    print (f"Running {test_name} on {len(files)} files in {directory_path}...")
+    print(f"Running {test_name} on {len(files)} files in {directory_path}...")
 
     for file in files:
         file_handler = _add_test_file_logger(logger, results_path, file, test_name)
@@ -192,5 +211,3 @@ def RunTestOnAllSubtitleFiles(run_test : Callable, test_options: list[dict], dir
 
         finally:
             logger.removeHandler(file_handler)
-
-

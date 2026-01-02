@@ -4,43 +4,52 @@ from pathlib import Path
 
 logger = logging.getLogger("exsubs")
 
-def detect_and_convert_encoding(sub_file : Path) -> bool:
+
+def detect_and_convert_encoding(sub_file: Path) -> bool:
     """Detect file encoding and convert to UTF-8 if needed"""
     try:
         # Try to detect encoding with chardet if available
         try:
             import chardet
 
-            with open(sub_file, 'rb') as f:
+            with open(sub_file, "rb") as f:
                 raw_data = f.read()
 
             detected = chardet.detect(raw_data)
-            encoding = detected.get('encoding', 'utf-8')
-            confidence = detected.get('confidence', 0)
+            encoding = detected.get("encoding", "utf-8")
+            confidence = detected.get("confidence", 0)
 
             logger.info(f"Detected encoding: {encoding} (confidence: {confidence:.2f})")
 
             # If already UTF-8 or very low confidence, try UTF-8 first
-            if encoding.lower() in ['utf-8', 'ascii'] or confidence < 0.7:
+            if encoding.lower() in ["utf-8", "ascii"] or confidence < 0.7:
                 try:
-                    content = raw_data.decode('utf-8')
+                    content = raw_data.decode("utf-8")
                     logger.info("File is already UTF-8 encoded")
                     return True
                 except UnicodeDecodeError:
                     pass
 
             # Try the detected encoding
-            if encoding and encoding.lower() != 'utf-8':
+            if encoding and encoding.lower() != "utf-8":
                 try:
                     content = raw_data.decode(encoding)
                     logger.info(f"Successfully decoded with {encoding}")
                 except UnicodeDecodeError:
-                    logger.warning(f"Failed to decode with detected encoding {encoding}")
+                    logger.warning(
+                        f"Failed to decode with detected encoding {encoding}"
+                    )
                     encoding = None
 
             # If detection failed, try common subtitle encodings
-            if not encoding or encoding.lower() == 'utf-8':
-                common_encodings = ['latin-1', 'windows-1252', 'cp1252', 'iso-8859-1', 'cp850']
+            if not encoding or encoding.lower() == "utf-8":
+                common_encodings = [
+                    "latin-1",
+                    "windows-1252",
+                    "cp1252",
+                    "iso-8859-1",
+                    "cp850",
+                ]
                 for enc in common_encodings:
                     try:
                         content = raw_data.decode(enc)
@@ -50,13 +59,15 @@ def detect_and_convert_encoding(sub_file : Path) -> bool:
                     except UnicodeDecodeError:
                         continue
                 else:
-                    logger.error("Could not decode subtitle file with any known encoding")
+                    logger.error(
+                        "Could not decode subtitle file with any known encoding"
+                    )
                     return False
 
             # Convert to UTF-8 if needed
-            if encoding.lower() != 'utf-8':
+            if encoding.lower() != "utf-8":
                 logger.info(f"Converting from {encoding} to UTF-8")
-                with open(sub_file, 'w', encoding='utf-8') as f:
+                with open(sub_file, "w", encoding="utf-8") as f:
                     f.write(content)
 
             return True
@@ -70,26 +81,26 @@ def detect_and_convert_encoding(sub_file : Path) -> bool:
         return _manual_encoding_conversion(sub_file)
 
 
-def _manual_encoding_conversion(sub_file : Path) -> bool:
+def _manual_encoding_conversion(sub_file: Path) -> bool:
     """Fallback encoding conversion without chardet"""
     try:
         # Try UTF-8 first
-        with open(sub_file, 'r', encoding='utf-8') as f:
+        with open(sub_file, "r", encoding="utf-8") as f:
             content = f.read()
         return True
     except UnicodeDecodeError:
         pass
 
     # Try common subtitle encodings
-    encodings = ['latin-1', 'windows-1252', 'cp1252', 'iso-8859-1', 'cp850', 'utf-16']
+    encodings = ["latin-1", "windows-1252", "cp1252", "iso-8859-1", "cp850", "utf-16"]
 
     for encoding in encodings:
         try:
-            with open(sub_file, 'r', encoding=encoding) as f:
+            with open(sub_file, "r", encoding=encoding) as f:
                 content = f.read()
 
             # Convert to UTF-8
-            with open(sub_file, 'w', encoding='utf-8') as f:
+            with open(sub_file, "w", encoding="utf-8") as f:
                 f.write(content)
 
             logger.info(f"Converted subtitle from {encoding} to UTF-8")
@@ -102,7 +113,7 @@ def _manual_encoding_conversion(sub_file : Path) -> bool:
     return False
 
 
-def preprocess_timecodes(sub_file : Path):
+def preprocess_timecodes(sub_file: Path):
     """Fix encoding and timecode formats before filtering"""
     # First, ensure the file is UTF-8 encoded
     if not detect_and_convert_encoding(sub_file):
@@ -119,7 +130,7 @@ def preprocess_timecodes(sub_file : Path):
         f.write(processed)
 
 
-def postprocess_timecodes(sub_file : Path):
+def postprocess_timecodes(sub_file: Path):
     """Restore original timecode format after filtering"""
     with open(sub_file, "r", encoding="utf-8") as f:
         content = f.read()
@@ -131,7 +142,7 @@ def postprocess_timecodes(sub_file : Path):
         f.write(processed)
 
 
-def filter_subtitles(sub_file : Path):
+def filter_subtitles(sub_file: Path):
     """Filter subtitles using subtitle_filter if available"""
     try:
         from subtitle_filter import Subtitles

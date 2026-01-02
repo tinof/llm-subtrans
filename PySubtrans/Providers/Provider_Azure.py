@@ -6,10 +6,12 @@ from PySubtrans.Options import SettingsType, env_str
 from PySubtrans.SettingsType import GuiSettingsType, SettingsType
 
 if not importlib.util.find_spec("openai"):
-    logging.debug(_("OpenAI SDK is not installed. Azure provider will not be available"))
+    logging.debug(
+        _("OpenAI SDK is not installed. Azure provider will not be available")
+    )
 else:
     try:
-        import openai   # type: ignore
+        import openai  # type: ignore
 
         from PySubtrans.Providers.Clients.AzureOpenAIClient import AzureOpenAIClient
         from PySubtrans.TranslationClient import TranslationClient
@@ -23,47 +25,67 @@ else:
             <p>To use Azure as a provider you need to provide the name and address of an OpenAI Azure deployment, an API version and API Key.</p>
             """
 
-            def __init__(self, settings : SettingsType):
-                super().__init__(self.name, SettingsType({
-                    "api_key": settings.get_str('api_key', env_str('AZURE_API_KEY')),
-                    "api_base": settings.get_str('api_base', env_str('AZURE_API_BASE')),
-                    "api_version": settings.get_str('api_version', env_str('AZURE_API_VERSION')),
-                    "deployment_name": settings.get_str('deployment_name', env_str('AZURE_DEPLOYMENT_NAME')),
-                }))
+            def __init__(self, settings: SettingsType):
+                super().__init__(
+                    self.name,
+                    SettingsType(
+                        {
+                            "api_key": settings.get_str(
+                                "api_key", env_str("AZURE_API_KEY")
+                            ),
+                            "api_base": settings.get_str(
+                                "api_base", env_str("AZURE_API_BASE")
+                            ),
+                            "api_version": settings.get_str(
+                                "api_version", env_str("AZURE_API_VERSION")
+                            ),
+                            "deployment_name": settings.get_str(
+                                "deployment_name", env_str("AZURE_DEPLOYMENT_NAME")
+                            ),
+                        }
+                    ),
+                )
 
-                self.refresh_when_changed = ['api_key', 'api_base', 'api_version', 'deployment_name']
+                self.refresh_when_changed = [
+                    "api_key",
+                    "api_base",
+                    "api_version",
+                    "deployment_name",
+                ]
 
             @property
-            def api_key(self) -> str|None:
-                return self.settings.get_str( 'api_key')
+            def api_key(self) -> str | None:
+                return self.settings.get_str("api_key")
 
             @property
-            def api_base(self) -> str|None:
-                return self.settings.get_str( 'api_base')
+            def api_base(self) -> str | None:
+                return self.settings.get_str("api_base")
 
             @property
-            def api_version(self) -> str|None:
-                return self.settings.get_str( 'api_version')
+            def api_version(self) -> str | None:
+                return self.settings.get_str("api_version")
 
             @property
-            def deployment_name(self) -> str|None:
-                return self.settings.get_str( 'deployment_name')
+            def deployment_name(self) -> str | None:
+                return self.settings.get_str("deployment_name")
 
-            def GetTranslationClient(self, settings : SettingsType) -> TranslationClient:
+            def GetTranslationClient(self, settings: SettingsType) -> TranslationClient:
                 client_settings = SettingsType(self.settings.copy())
                 client_settings.update(settings)
-                client_settings.update({
-                    'supports_conversation': True,
-                    'supports_system_messages': True
-                    })
+                client_settings.update(
+                    {"supports_conversation": True, "supports_system_messages": True}
+                )
                 return AzureOpenAIClient(client_settings)
 
-            def GetOptions(self, settings : SettingsType) -> GuiSettingsType:
-                options : GuiSettingsType = {
-                    'api_key': (str, _("An Azure API key is required")),
-                    'api_version': (str, _("An Azure API version is required")),
-                    'deployment_name': (str, _("An Azure API deployment name is required")),
-                    'api_base': (str, _("The Azure API base URL to use for requests.")),
+            def GetOptions(self, settings: SettingsType) -> GuiSettingsType:
+                options: GuiSettingsType = {
+                    "api_key": (str, _("An Azure API key is required")),
+                    "api_version": (str, _("An Azure API version is required")),
+                    "deployment_name": (
+                        str,
+                        _("An Azure API deployment name is required"),
+                    ),
+                    "api_base": (str, _("The Azure API base URL to use for requests.")),
                 }
 
                 return options
@@ -106,4 +128,6 @@ else:
                 return True
 
     except ImportError:
-        logging.info(_("OpenAI SDK not installed. Azure provider will not be available"))
+        logging.info(
+            _("OpenAI SDK not installed. Azure provider will not be available")
+        )
