@@ -615,7 +615,8 @@ def translate_srt_file(
         sub_file, desired_path, target_language, lang_code
     )
     if normalised.exists():
-        _fix_finnish_subtitles(normalised)
+        if lang_code == "fi":
+            _fix_finnish_subtitles(normalised)
 
 
 def main() -> int:

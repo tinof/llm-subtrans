@@ -635,7 +635,8 @@ def process_video_file(
         )
 
         if translated_file.exists():
-            _fix_finnish_subtitles(translated_file)
+            if lang_code == "fi":
+                _fix_finnish_subtitles(translated_file)
 
             # Clean up the original extracted subtitle if translation succeeded
             if subtitle_file.exists():
