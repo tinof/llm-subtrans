@@ -111,6 +111,7 @@ class SubtitleFormatRegistry:
         Load and register all subtitle file handlers using reflection.
         """
         # Import the formats package, which will trigger explicit imports
+        import PySubtrans.Formats  # noqa: F401
 
         for handler_class in SubtitleFileHandler.__subclasses__():
             cls.register_handler(handler_class)
