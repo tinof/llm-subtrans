@@ -119,7 +119,7 @@ class TranslationProvider:
         """
         if not cls.__subclasses__():
             # Import the providers package, which will trigger explicit imports
-            pass  # type: ignore[ignore-unused]
+            import PySubtrans.Providers  # noqa: F401
 
         providers = {
             cast(TranslationProvider, provider).name: provider
