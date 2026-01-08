@@ -50,9 +50,6 @@ untranslated_msgids_*.txt
 /subtitles
 /translated
 batch-translate.sh
-AGENTS.md
-CLAUDE.md
-GEMINI.md
 /testfiles
 .aidigestignore
 .aidigestminify
