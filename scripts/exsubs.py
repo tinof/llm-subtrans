@@ -547,6 +547,7 @@ def process_video_file(
     parallel_workers: int = 4,
     max_batch_size: int | None = None,
     min_batch_size: int | None = None,
+    filter_subs: bool = True,
 ):
     """Process a single video file - extract and translate subtitles"""
     logger.info(f"Processing {video_file}")
@@ -612,7 +613,8 @@ def process_video_file(
 
     # Process subtitles: preprocess → filter → postprocess
     preprocess_timecodes(subtitle_file)
-    filter_subtitles(subtitle_file)
+    if filter_subs:
+        filter_subtitles(subtitle_file)
     postprocess_timecodes(subtitle_file)
 
     # Translate subtitles using PySubtrans API
@@ -941,6 +943,7 @@ def process_directory(
     parallel_workers: int = 4,
     max_batch_size: int | None = None,
     min_batch_size: int | None = None,
+    filter_subs: bool = True,
 ):
     """Process all MKV files in the current directory"""
     # Get all MKV files and sort them
@@ -986,6 +989,7 @@ def process_directory(
                     parallel_workers=parallel_workers,
                     max_batch_size=max_batch_size,
                     min_batch_size=min_batch_size,
+                    filter_subs=filter_subs,
                 )
                 translated_file = _normalise_translated_output(
                     subtitle_file, translated_file, config.target_language, lang_code
@@ -1048,6 +1052,11 @@ def main():
     )
 
     parser.add_argument("-l", "--language", help="Target language")
+    parser.add_argument(
+        "--no-filter",
+        action="store_true",
+        help="Disable subtitle filtering (preserve music cues, fonts, effects, etc.)",
+    )
     parser.add_argument(
         "--no-progress", action="store_true", help="Disable progress bars"
     )
@@ -1180,6 +1189,8 @@ def main():
                 show_progress = not args.no_progress
                 show_metrics = not args.no_metrics
 
+                filter_subs = not args.no_filter
+
                 if args.file:
                     # Process single file
                     process_video_file(
@@ -1194,6 +1205,7 @@ def main():
                         parallel_workers=args.parallel_workers,
                         max_batch_size=args.max_batch_size,
                         min_batch_size=args.min_batch_size,
+                        filter_subs=filter_subs,
                     )
                 else:
                     # Process all MKV files in current directory
@@ -1207,6 +1219,7 @@ def main():
                         parallel_workers=args.parallel_workers,
                         max_batch_size=args.max_batch_size,
                         min_batch_size=args.min_batch_size,
+                        filter_subs=filter_subs,
                     )
 
                 return 0

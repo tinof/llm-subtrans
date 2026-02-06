@@ -361,6 +361,7 @@ def translate_srt_file(
     show_progress: bool = True,
     show_metrics: bool = True,
     proofread: bool = False,
+    filter_subs: bool = True,
 ) -> None:
     from PySubtrans.MKV.Config import (
         MODE_TO_DEFAULT_MODEL,
@@ -370,7 +371,8 @@ def translate_srt_file(
 
     # Preprocess the input file in place
     preprocess_timecodes(sub_file)
-    filter_subtitles(sub_file)
+    if filter_subs:
+        filter_subtitles(sub_file)
     postprocess_timecodes(sub_file)
 
     # Provider mapping
@@ -654,6 +656,11 @@ def main() -> int:
         help="Answer yes to prompts for setup assistant",
     )
     parser.add_argument(
+        "--no-filter",
+        action="store_true",
+        help="Disable subtitle filtering (preserve music cues, fonts, effects, etc.)",
+    )
+    parser.add_argument(
         "--no-progress", action="store_true", help="Disable translation progress line"
     )
     parser.add_argument(
@@ -704,6 +711,7 @@ def main() -> int:
             provider_flag,
             show_metrics=not args.no_metrics,
             proofread=args.proofread,
+            filter_subs=not args.no_filter,
         )
         return 0
     except Exception as e:
