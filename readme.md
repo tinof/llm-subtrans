@@ -10,23 +10,22 @@ Note: LLM-Subtrans requires an active internet connection. Subtitles are sent to
 
 ## Installation
 
-### Quick Install with pipx (Recommended)
+### Quick Install with uv (Recommended)
 
-[pipx](https://pipx.pypa.io/) is the recommended way to install CLI Python applications. It creates an isolated environment automatically and adds the command-line tools to your PATH.
+[uv](https://docs.astral.sh/uv/) is the recommended way to install and run this CLI project. It provides fast, reproducible environments and replaces pip/pipx workflows.
 
 ```sh
-# Install pipx if you don't have it
-pip install --user pipx
-pipx ensurepath
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude) — MKV/exsubs tooling is included by default
-pipx install "llm-subtrans[openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
+# Install llm-subtrans with commonly used providers (OpenAI, Gemini, Claude)
+uv tool install "llm-subtrans[openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
 
 # Or install with all providers
-pipx install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure] @ git+https://github.com/tinof/llm-subtrans.git"
+uv tool install "llm-subtrans[openai,gemini,claude,mistral,bedrock,azure] @ git+https://github.com/tinof/llm-subtrans.git"
 
 # Or minimal install (OpenRouter only - no additional dependencies)
-pipx install "llm-subtrans @ git+https://github.com/tinof/llm-subtrans.git"
+uv tool install "llm-subtrans @ git+https://github.com/tinof/llm-subtrans.git"
 ```
 
 After installation, all command-line tools will be available directly:
@@ -59,7 +58,7 @@ exsubs video.mkv --gemini -l Finnish
   - scene threshold 240s
   - min/max batch size 80/180 lines
   - context summaries 6
-  - rate limit 150 RPM (auto‑raised to 1000 RPM if you set `GEMINI_MODEL=gemini-2.5-flash-preview-09-2025`)
+  - rate limit 150 RPM (auto-raised to 1000 RPM if you set `GEMINI_MODEL=gemini-2.5-flash-preview-09-2025`)
 
 ### Vertex AI setup (default for `exsubs` and available to `transubs`)
 
@@ -84,7 +83,7 @@ exsubs video.mkv --gemini -l Finnish
    echo 'export SCENE_THRESHOLD=240 MIN_BATCH_SIZE=80 MAX_BATCH_SIZE=180 MAX_CONTEXT_SUMMARIES=6' >> ~/.zshrc
    ```
    Reload your shell (`exec $SHELL`) after editing the file. You can override the model, rate limit, or other Gemini settings the same way; if no environment variable is defined llm-subtrans falls back to the defaults shown here.
-   - If you switch to the Flash preview model, the CLI auto‑applies tuned defaults and a 1000 RPM limit:
+   - If you switch to the Flash preview model, the CLI auto-applies tuned defaults and a 1000 RPM limit:
      ```sh
      export GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
      # Defaults applied automatically for Flash:
@@ -92,7 +91,7 @@ exsubs video.mkv --gemini -l Finnish
      # You can still override via env:
      export SCENE_THRESHOLD=300 MIN_BATCH_SIZE=100 MAX_BATCH_SIZE=220 MAX_CONTEXT_SUMMARIES=6
      ```
-5. Guided setup: you can run a built‑in assistant that checks gcloud, ADC and writes persistent defaults to your shell profile:
+5. Guided setup: you can run a built-in assistant that checks gcloud, ADC and writes persistent defaults to your shell profile:
    ```sh
    exsubs --setup-vertex         # add -y to skip prompts
    # or, from the .srt workflow:
@@ -106,14 +105,14 @@ To upgrade or uninstall:
 
 ```sh
 # Upgrade to latest version
-pipx upgrade llm-subtrans
+uv tool upgrade llm-subtrans
 
 # Reinstall with different extras
-pipx uninstall llm-subtrans
-pipx install "llm-subtrans[openai,gemini,claude]"
+uv tool uninstall llm-subtrans
+uv tool install "llm-subtrans[openai,gemini,claude] @ git+https://github.com/tinof/llm-subtrans.git"
 
 # Uninstall
-pipx uninstall llm-subtrans
+uv tool uninstall llm-subtrans
 ```
 
 ## Translation Providers
@@ -194,7 +193,7 @@ To use Bedrock, you must:
 
 ### Development Installation
 
-For development or if you prefer more control over the setup, you'll need Python 3.10+ and pip installed.
+For development, use uv to create and manage the project environment.
 
 Clone the repository:
 
@@ -203,21 +202,8 @@ git clone https://github.com/tinof/llm-subtrans.git
 cd llm-subtrans
 ```
 
-#### Option 1: Using install.sh (Recommended for Development)
+1. Create a new `.env` file in the project root and add any required provider settings:
 
-The `install.sh` script will create a virtual environment and install dependencies:
-
-```sh
-./install.sh
-```
-
-This creates a virtual environment in `envsubtrans/` and installs the project in editable mode.
-
-#### Option 2: Manual Setup
-
-If you prefer to set up manually:
-
-1. Create a new file named .env in the root directory of the project. Add any required settings for your chosen provider to the .env file like this:
     ```sh
     OPENROUTER_API_KEY=<your_openrouter_api_key>
     OPENAI_API_KEY=<your_openai_api_key>
@@ -250,32 +236,18 @@ If you prefer to set up manually:
     OPENAI_REASONING_EFFORT=low/medium/high
     ```
 
-2. Create a virtual environment:
+2. Sync dependencies (core + provider extras + dev tooling):
 
     ```sh
-    python3 -m venv envsubtrans
+    uv sync --all-extras --dev
     ```
 
-3. Activate the virtual environment (required each time you work on the project):
+3. Run commands through uv:
 
     ```sh
-    source ./envsubtrans/bin/activate
-    ```
-
-4. Install the project in editable mode:
-
-    ```sh
-    # Minimal install (OpenRouter only)
-    pip install -e .
-
-    # With commonly used providers
-    pip install -e ".[openai,gemini,claude]"
-
-    # With all providers
-    pip install -e ".[openai,gemini,claude,mistral,bedrock,azure]"
-
-    # With MKV extraction support
-    pip install -e ".[mkv,openai,gemini,claude]"
+    uv run llm-subtrans --auto -l Spanish subtitle.srt
+    uv run pytest
+    uv run ruff check
     ```
 
 ## Usage
@@ -314,8 +286,8 @@ exsubs --diagnose                                 # Run system diagnostics
 # List supported subtitle formats
 llm-subtrans --list-formats
 
-# Batch process files in a folder tree (activate the virtual environment first)
-python scripts/batch_translate.py ./subtitles ./translated --provider openai --model gpt-5-mini --apikey sk-... --language Spanish
+# Batch process files in a folder tree
+uv run python scripts/batch_translate.py ./subtitles ./translated --provider openai --model gpt-5-mini --apikey sk-... --language Spanish
 ```
 
 The output format is inferred from file extensions. To convert between formats, provide an output path with the desired extension.
@@ -573,22 +545,22 @@ You can modify the `DEFAULT_OPTIONS` values directly in the script file, or use 
 
 ```sh
 # Preview mode to test settings without making API calls
-python scripts/batch_translate.py --preview
+uv run python scripts/batch_translate.py --preview
 
 # Basic usage with command line arguments
-python scripts/batch_translate.py ./subtitles ./translated --provider openai --model gpt-5-mini --apikey sk-... --language Spanish
+uv run python scripts/batch_translate.py ./subtitles ./translated --provider openai --model gpt-5-mini --apikey sk-... --language Spanish
 
 # Override output format
-python scripts/batch_translate.py ./subtitles ./translated --provider openai --output-format srt
+uv run python scripts/batch_translate.py ./subtitles ./translated --provider openai --output-format srt
 
 # Use additional options
-python scripts/batch_translate.py ./subtitles ./translated --provider openai --option max_batch_size=40 --option preprocess_subtitles=false
+uv run python scripts/batch_translate.py ./subtitles ./translated --provider openai --option max_batch_size=40 --option preprocess_subtitles=false
 ```
 
 ### Developers
 It is recommended to use an IDE such as Visual Studio Code to run the program when installed from source, and set up a launch.json file to specify the arguments.
 
-Note: Remember to activate the virtual environment every time you work on the project.
+Note: Use `uv run ...` for project commands instead of activating a virtual environment manually.
 
 ## Contributing
 Contributions from the community are welcome! To contribute, follow these steps:

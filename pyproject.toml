@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.8.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "llm-subtrans"
-version = "1.6.0"
+dynamic = ["version"]
 description = "CLI subtitle translation tool with MKV extraction using large language models (Linux/macOS)"
 readme = "readme.md"
 requires-python = ">=3.10"
@@ -38,6 +38,16 @@ mistral = ["mistralai"]
 bedrock = ["boto3"]
 mkv = ["subtitle_filter", "chardet", "filelock", "rich"]
 
+[dependency-groups]
+dev = [
+    "basedpyright>=1.31.4",
+    "pytest>=8.3.4",
+    "ruff>=0.12.0",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
 [project.scripts]
 llm-subtrans = "scripts.llm_subtrans:main"
 gpt-subtrans = "scripts.gpt_subtrans:main"
@@ -51,14 +61,36 @@ batch-translate = "scripts.batch_translate:main"
 exsubs = "scripts.exsubs:main"
 transubs = "scripts.transubs:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["PySubtrans*", "scripts*", "instructions*"]
-namespaces = true
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
 
-[tool.setuptools.package-data]
-instructions = ["*.txt"]
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["PySubtrans", "scripts", "instructions"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["PySubtrans", "scripts", "tests"]
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ALL"]
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+include = ["src", "tests"]
+typeCheckingMode = "off"
+reportAny = false
+reportImplicitStringConcatenation = false
+reportMissingTypeStubs = false
