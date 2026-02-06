@@ -136,21 +136,45 @@ def _normalise_translated_output(
     return desired_file
 
 
+def _run_finnish_subtitle_fixer(translated_file: Path) -> int:
+    """Run fix-finnish-subs once and return its exit status."""
+    result = subprocess.run(["fix-finnish-subs", str(translated_file)], check=False)
+    return result.returncode
+
+
 def _fix_finnish_subtitles(translated_file: Path) -> None:
     """Run fix-finnish-subs on the translated subtitle file."""
     if not translated_file.exists():
         logger.warning(f"Cannot fix subtitles; {translated_file} does not exist")
         return
 
-    try:
-        subprocess.run(["fix-finnish-subs", str(translated_file)], check=True)
+    report_file = translated_file.with_stem(translated_file.stem + "_unfixed").with_suffix(".txt")
+
+    first_exit = _run_finnish_subtitle_fixer(translated_file)
+    if first_exit == 0:
         logger.info(f"Fixed subtitles with fix-finnish-subs: {translated_file.name}")
-    except subprocess.CalledProcessError as exc:
-        logger.error(f"fix-finnish-subs failed for {translated_file}: {exc}")
-    except Exception as exc:
-        logger.error(
-            f"Unexpected error running fix-finnish-subs for {translated_file}: {exc}"
+        return
+
+    logger.warning(
+        "fix-finnish-subs returned non-zero exit status %s for %s; retrying once",
+        first_exit,
+        translated_file,
+    )
+    second_exit = _run_finnish_subtitle_fixer(translated_file)
+    if second_exit == 0:
+        logger.info(
+            "Fixed subtitles with fix-finnish-subs after retry: %s",
+            translated_file.name,
         )
+        return
+
+    logger.warning(
+        "fix-finnish-subs completed with remaining issues for %s (exit %s). "
+        "See report: %s",
+        translated_file,
+        second_exit,
+        report_file,
+    )
 
 
 class TranslationMetrics:
@@ -863,7 +887,7 @@ def translate_subtitles(
 
     # Set instruction file if it exists
     if config.instruction_file and config.instruction_file.exists():
-        settings["instructionfile"] = str(config.instruction_file)
+        settings["instruction_file"] = str(config.instruction_file)
 
     options = Options(settings)
 

@@ -117,19 +117,44 @@ def _normalise_translated_output(
     return desired_file
 
 
+def _run_finnish_subtitle_fixer(translated_file: Path) -> int:
+    """Run fix-finnish-subs once and return its exit status."""
+    result = subprocess.run(["fix-finnish-subs", str(translated_file)], check=False)
+    return result.returncode
+
+
 def _fix_finnish_subtitles(translated_file: Path) -> None:
     if not translated_file.exists():
         logger.warning(f"Cannot fix subtitles; {translated_file} does not exist")
         return
-    try:
-        subprocess.run(["fix-finnish-subs", str(translated_file)], check=True)
+
+    report_file = translated_file.with_stem(translated_file.stem + "_unfixed").with_suffix(".txt")
+
+    first_exit = _run_finnish_subtitle_fixer(translated_file)
+    if first_exit == 0:
         logger.info(f"Fixed subtitles with fix-finnish-subs: {translated_file.name}")
-    except subprocess.CalledProcessError as exc:
-        logger.error(f"fix-finnish-subs failed for {translated_file}: {exc}")
-    except Exception as exc:
-        logger.error(
-            f"Unexpected error running fix-finnish-subs for {translated_file}: {exc}"
+        return
+
+    logger.warning(
+        "fix-finnish-subs returned non-zero exit status %s for %s; retrying once",
+        first_exit,
+        translated_file,
+    )
+    second_exit = _run_finnish_subtitle_fixer(translated_file)
+    if second_exit == 0:
+        logger.info(
+            "Fixed subtitles with fix-finnish-subs after retry: %s",
+            translated_file.name,
         )
+        return
+
+    logger.warning(
+        "fix-finnish-subs completed with remaining issues for %s (exit %s). "
+        "See report: %s",
+        translated_file,
+        second_exit,
+        report_file,
+    )
 
 
 class TranslationMetrics:
@@ -519,8 +544,6 @@ def translate_srt_file(
         settings["rate_limit"] = rate_limit
     settings.update(settings_vertex)
 
-    options = Options(settings)
-
     # Display configuration information
     effective_language = target_language or MKVConfig().target_language
     lang_code = MKVConfig.get_language_code(effective_language)
@@ -532,19 +555,6 @@ def translate_srt_file(
     console.print(f"  Temperature: {temperature}")
     if rate_limit:
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
-
-    # Display instruction file info (if MKVConfig has one configured)
-    # We need to re-resolve the instruction file if a target language is provided
-    config = MKVConfig(target_language=effective_language)
-
-    if config.instruction_file and config.instruction_file.exists():
-        console.print(f"  Instructions: {config.instruction_file}")
-    elif config.instruction_file:
-        console.print(
-            f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]"
-        )
-    else:
-        console.print("  Instructions: [dim]None[/dim]")
 
     console.print()
 
@@ -568,6 +578,20 @@ def translate_srt_file(
 
         # Override output language code to 'proofread' to avoid overwriting original/translated files
         lang_code = "proofread"
+
+    options = Options(settings)
+
+    # Display instruction file info (if Options has one set)
+    if options.instruction_file and options.instruction_file.exists():
+        console.print(f"  Instructions: {options.instruction_file}")
+    elif options.instruction_file:
+        console.print(
+            f"  Instructions: {options.instruction_file} [yellow](not found)[/yellow]"
+        )
+    else:
+        console.print("  Instructions: [dim]None[/dim]")
+
+    console.print()
 
     desired_path = _build_translated_output_path(sub_file, lang_code)
     project.InitialiseProject(str(sub_file), str(desired_path))
