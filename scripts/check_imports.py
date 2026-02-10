@@ -15,12 +15,10 @@ def check_required_imports(modules: list[str], pip_extras: str | None = None) ->
         print()
         if pip_extras:
             print("Installation options:")
-            print(f"  - pipx install 'llm-subtrans[{pip_extras}]'")
-            print(f"  - pip install '.[{pip_extras}]'")
-            print(f"  - Run ./install.sh and select the {pip_extras} provider")
+            print(f"  - uv tool install 'llm-subtrans[{pip_extras}]'")
+            print(f"  - uv sync --extra {pip_extras}")
         else:
             print("Installation options:")
-            print("  - pipx install llm-subtrans")
-            print("  - pip install .")
-            print("  - Run ./install.sh")
+            print("  - uv tool install llm-subtrans")
+            print("  - uv sync --all-extras")
         sys.exit(1)
