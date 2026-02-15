@@ -53,3 +53,7 @@ batch-translate.sh
 /testfiles
 .aidigestignore
 .aidigestminify
+.codanna/
+.codannaignore
+.fastembed_cache
+.osgrep
