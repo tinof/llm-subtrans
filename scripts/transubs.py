@@ -18,7 +18,7 @@ from PySubtrans.MKV import (
     postprocess_timecodes,
     filter_subtitles,
 )
-from PySubtrans.MKV.Config import TranslationMode
+from PySubtrans.MKV.Config import MKVConfig, TranslationMode
 
 from PySubtrans import batch_subtitles, init_translator
 from PySubtrans.Options import Options
@@ -46,6 +46,36 @@ FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
 LANGUAGE_SUFFIX_PATTERN = regex.compile(r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE)
+SEASON_EPISODE_PATTERN = regex.compile(
+    r"S(\d{1,2})E(\d{1,3})"  # S01E02
+    r"|(\d{1,2})x(\d{1,3})"  # 1x02
+    r"|(\d{1,2})\.(\d{2})",  # 1.02
+    regex.IGNORECASE,
+)
+SUBTITLE_EXTENSIONS = {".srt", ".ass", ".ssa", ".vtt"}
+
+
+def _parse_season_episode(filename: str) -> tuple[int, int]:
+    """Extract (season, episode) from a filename, or (0, 0) if not found."""
+    match = SEASON_EPISODE_PATTERN.search(filename)
+    if match:
+        groups = match.groups()
+        for i in range(0, len(groups), 2):
+            if groups[i] is not None:
+                return int(groups[i]), int(groups[i + 1])
+    return 0, 0
+
+
+def _is_already_translated(sub_file: Path, lang_code: str) -> bool:
+    """Check if a translated version of this subtitle file already exists."""
+    translated = _build_translated_output_path(sub_file, lang_code)
+    return translated.exists()
+
+
+def _is_translated_file(sub_file: Path, lang_code: str) -> bool:
+    """Check if this file IS a translated file (e.g. Movie.fi.srt)."""
+    stem = sub_file.stem
+    return stem.endswith(f".{lang_code}")
 
 
 def _looks_like_language_suffix(suffix: str) -> bool:
@@ -370,7 +400,6 @@ def translate_srt_file(
     from PySubtrans.MKV.Config import (
         MODE_TO_DEFAULT_MODEL,
         MODE_TO_RATE_LIMIT,
-        MKVConfig,
     )
 
     # Preprocess the input file in place
@@ -603,11 +632,91 @@ def translate_srt_file(
             _fix_finnish_subtitles(normalised)
 
 
+def process_directory(
+    target_language: str | None,
+    provider_flag: str,
+    *,
+    show_metrics: bool = True,
+    proofread: bool = False,
+    filter_subs: bool = True,
+) -> int:
+    """Process all untranslated subtitle files in the current directory."""
+    config = MKVConfig(target_language=target_language or MKVConfig().target_language)
+    lang_code = MKVConfig.get_language_code(config.target_language).lower()
+
+    # Discover subtitle files (flat, not recursive)
+    all_subs: list[Path] = []
+    for ext in SUBTITLE_EXTENSIONS:
+        all_subs.extend(Path().glob(f"*{ext}"))
+
+    # Filter out translated files and duplicates
+    source_subs = sorted(
+        {f for f in all_subs if f.is_file() and not _is_translated_file(f, lang_code)},
+        key=lambda p: (_parse_season_episode(p.name), p.name),
+    )
+
+    if not source_subs:
+        console.print("[yellow]No subtitle files found in current directory[/yellow]")
+        return 0
+
+    # Determine which still need translation
+    pending: list[Path] = []
+    for sub in source_subs:
+        if _is_already_translated(sub, lang_code):
+            console.print(f"[yellow]⏭ Skipping[/yellow] {sub.name} — translation exists")
+        else:
+            pending.append(sub)
+
+    if not pending:
+        console.print("[green]✓ All subtitle files already translated[/green]")
+        return 0
+
+    console.print(
+        f"\n[bold cyan]Starting subtitle processing[/bold cyan]"
+        f" — {len(pending)} file(s) to translate, {len(source_subs) - len(pending)} skipped\n"
+    )
+
+    stats: dict[str, int] = {"processed": 0, "skipped": 0, "failed": 0}
+    for sub in pending:
+        console.print(f"[bold]⚙ Processing[/bold] {sub.name}")
+        try:
+            translate_srt_file(
+                sub,
+                target_language,
+                provider_flag,
+                show_metrics=show_metrics,
+                proofread=proofread,
+                filter_subs=filter_subs,
+            )
+            stats["processed"] += 1
+            console.print(f"[green]✓ Completed[/green] {sub.name}\n")
+        except Exception as e:
+            stats["failed"] += 1
+            logger.error(f"Failed to translate {sub.name}: {e}")
+            console.print(f"[red]✗ Failed[/red] {sub.name}: {e}\n")
+
+    # Summary
+    console.print("\n[bold cyan]Summary[/bold cyan]")
+    console.print(f"  Processed: {stats['processed']}")
+    if stats["failed"]:
+        console.print(f"  [red]Failed: {stats['failed']}[/red]")
+    console.print(f"  Skipped: {len(source_subs) - len(pending)}")
+
+    return 1 if stats["failed"] else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Translate an .srt (or supported) subtitle file using tuned exsubs defaults"
+        description="Translate subtitle files using tuned exsubs defaults. "
+        "If no file is given, processes all untranslated subtitles in the current directory."
     )
-    parser.add_argument("file", help="Subtitle file to translate (.srt, .ass, .vtt)")
+    parser.add_argument(
+        "file",
+        nargs="?",
+        default=None,
+        help="Subtitle file to translate (.srt, .ass, .vtt). "
+        "Omit to process all untranslated files in the current directory.",
+    )
     # provider choice similar to exsubs
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument("--gemini", action="store_true", help="Use Gemini model (default)")
@@ -659,11 +768,7 @@ def main() -> int:
             console.print(f"[red]Failed to run setup assistant:[/red] {e}")
             return 1
 
-    sub_path = Path(args.file)
-    if not sub_path.exists() or not sub_path.is_file():
-        logger.error(f"Subtitle file not found: {sub_path}")
-        return 1
-
+    # Determine provider from environment then CLI flags
     env_mode = _env_default_mode()
     provider_flag = "gemini"
     if env_mode == TranslationMode.CHATGPT:
@@ -679,6 +784,22 @@ def main() -> int:
         provider_flag = "claude"
     elif args.deepseek:
         provider_flag = "deepseek"
+
+    # Directory mode: process all untranslated subtitles in current directory
+    if args.file is None:
+        return process_directory(
+            target_language=args.language,
+            provider_flag=provider_flag,
+            show_metrics=not args.no_metrics,
+            proofread=args.proofread,
+            filter_subs=not args.no_filter,
+        )
+
+    # Single-file mode
+    sub_path = Path(args.file)
+    if not sub_path.exists() or not sub_path.is_file():
+        logger.error(f"Subtitle file not found: {sub_path}")
+        return 1
 
     try:
         translate_srt_file(
