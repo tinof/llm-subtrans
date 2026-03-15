@@ -1,19 +1,18 @@
 # LLM-Subtrans (CLI Edition)
 
-**A specialized CLI subtitle translator for Linux and macOS.**
+A specialized CLI subtitle translator for Linux and macOS. 
 
-This fork is streamlined for high-performance CLI usage, utilizing modern Python tooling (`uv`) and specialized workflows for power users.
+This repository is a hard fork of [machinewrapped/llm-subtrans](https://github.com/machinewrapped/llm-subtrans), stripped of all Windows/GUI bloat and heavily optimized for terminal power users, automation, and superior linguistic quality.
 
-## Key Features
+## Key Features & Upgrades
 
-- **CLI Only**: No GUI, no Windows support. Optimized for Linux/macOS terminals.
-- **Modern Stack**: Built with [`uv`](https://docs.astral.sh/uv/) for fast, reproducible environments.
-- **Specialized Scripts**:
-  - `exsubs`: Full pipeline to extract subtitles from MKV, translate, and manage the workflow.
-  - `transubs`: Efficient SRT/ASS translation workflow.
-- **Gemini 1M Context**: First-class support for Google Gemini's massive context window, enabling whole-file translation for superior context retention.
-- **Provider Agnostic**: Support for OpenAI, Google Gemini (Vertex AI & AI Studio), Anthropic Claude, DeepSeek, Mistral, and OpenRouter.
-
+- **Smart Line Merging (`[MERGE]` tag):** The upstream engine strictly enforces a 1:1 translation ratio per line. This fork allows the AI to merge fragmented source lines into a single fluent line—critical for agglutinative languages (like Finnish, Turkish, or Japanese) where word order completely changes.
+- **All-in-One MKV Pipeline (`exsubs`):** Bypasses the need for external tools. Automatically extracts subtitle tracks directly from `.mkv` files, filters them, translates them, and saves the output.
+- **Parallel Translation:** Added `--parallel` mode to translate multiple subtitle batches simultaneously via `ThreadPoolExecutor`, making large jobs up to 8x faster.
+- **Large Context Mode:** Built to utilize the massive context windows of modern models (like Gemini 1.5/2.0). It feeds the AI thousands of tokens of story history to drastically improve character consistency and tone over long movies.
+- **CLI-Native Modern Stack:** No PySide6, no Windows hooks, no PyInstaller scripts. Built entirely around [`uv`](https://docs.astral.sh/uv/) for incredibly fast dependency and environment management.
+- **Direct Subtitle Workflow (`transubs`):** Efficient, highly-tuned SRT/ASS/VTT translation script for when you don't need MKV extraction.
+  
 ## Installation
 
 Install using [uv](https://docs.astral.sh/uv/) (recommended):
