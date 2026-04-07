@@ -57,3 +57,4 @@ batch-translate.sh
 .codannaignore
 .fastembed_cache
 .osgrep
+.serena/
