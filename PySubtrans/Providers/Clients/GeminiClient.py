@@ -1,9 +1,11 @@
 import logging
-
+import random
+import threading
 import time
 from typing import Any
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai.types import (
     AutomaticFunctionCallingConfig,
     Candidate,
@@ -37,8 +39,13 @@ class GeminiClient(TranslationClient):
     Handles communication with Google Gemini to request translations
     """
 
+    RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
     def __init__(self, settings: SettingsType):
         super().__init__(settings)
+
+        self._gemini_client: genai.Client | None = None
+        self._client_lock = threading.Lock()
 
         self._emit_info(
             _("Translating with Gemini {model} model").format(
@@ -84,15 +91,23 @@ class GeminiClient(TranslationClient):
         # Configure reasoning parameters
         enable_thinking = settings.get_bool("enable_thinking", False)
         thinking_budget = settings.get_int("thinking_budget", -1)
+        thinking_level = settings.get_str("thinking_level")
         include_thoughts = False  # Gemini appends thoughts to the text if this is true, breaking the parser
 
-        self.thinking_config: ThinkingConfig | None = (
-            ThinkingConfig(
+        # Gemini 3.x models use the thinking_level enum (minimal/low/medium/high);
+        # Gemini 2.5.x use the integer thinking_budget. They are mutually exclusive
+        # (sending both returns HTTP 400), so thinking_level wins when set. When
+        # neither is configured the model keeps its default dynamic thinking.
+        if thinking_level:
+            self.thinking_config: ThinkingConfig | None = ThinkingConfig(
+                include_thoughts=include_thoughts, thinking_level=thinking_level
+            )
+        elif enable_thinking:
+            self.thinking_config = ThinkingConfig(
                 include_thoughts=include_thoughts, thinking_budget=thinking_budget
             )
-            if enable_thinking
-            else None
-        )
+        else:
+            self.thinking_config = None
 
     @property
     def api_key(self) -> str | None:
@@ -159,6 +174,14 @@ class GeminiClient(TranslationClient):
                 raise
 
             except Exception as e:
+                if (
+                    isinstance(e, genai_errors.APIError)
+                    and e.code not in self.RETRYABLE_STATUS_CODES
+                ):
+                    raise TranslationImpossibleError(
+                        _("Gemini request failed: {error}").format(error=str(e))
+                    ) from e
+
                 if retry == self.max_retries:
                     raise TranslationImpossibleError(
                         _(
@@ -167,7 +190,11 @@ class GeminiClient(TranslationClient):
                     )
 
                 if not self.aborted:
-                    sleep_time = self.backoff_time * 2.0**retry
+                    # Truncated exponential backoff with jitter, per Google's 429 guidance
+                    base_delay = min(self.backoff_time * 2.0**retry, 60.0)
+                    sleep_time = round(
+                        base_delay + random.uniform(0.0, base_delay * 0.5), 1
+                    )
                     self._emit_warning(
                         _(
                             "Gemini request failure {error}, retrying in {sleep_time} seconds..."
@@ -188,7 +215,7 @@ class GeminiClient(TranslationClient):
         if not isinstance(prompt.content, str):
             raise TranslationImpossibleError(_("Content must be a string for Gemini"))
 
-        gemini_client = self._create_client()
+        gemini_client = self._get_client()
         config = GenerateContentConfig(
             candidate_count=1,
             temperature=temperature,
@@ -387,6 +414,15 @@ class GeminiClient(TranslationClient):
         return genai.Client(
             api_key=self.api_key, http_options={"api_version": "v1alpha"}
         )
+
+    def _get_client(self) -> genai.Client:
+        """
+        Create the genai client on first use and reuse it for subsequent requests
+        """
+        with self._client_lock:
+            if self._gemini_client is None:
+                self._gemini_client = self._create_client()
+            return self._gemini_client
 
     def _extract_block_info(self, gcr: GenerateContentResponse) -> str:
         """

@@ -470,8 +470,13 @@ def translate_srt_file(
         max_context_summaries = int(
             os.getenv("MAX_CONTEXT_SUMMARIES") or GEMINI_MAX_CONTEXT_SUMMARIES
         )
-        rate_limit = _determine_gemini_rate_limit(model)
-        os.environ.setdefault("GEMINI_RATE_LIMIT", str(int(rate_limit)))
+        if _using_vertex():
+            # Vertex uses dynamic shared quota - there is no fixed RPM to respect;
+            # transient 429s are absorbed by the client's exponential backoff
+            rate_limit = None
+        else:
+            rate_limit = _determine_gemini_rate_limit(model)
+            os.environ.setdefault("GEMINI_RATE_LIMIT", str(int(rate_limit)))
     elif mode == TranslationMode.CHATGPT:
         model = os.getenv("OPENAI_MODEL") or "gpt-5-mini"
         scene_threshold = float(os.getenv("SCENE_THRESHOLD") or 120.0)
@@ -556,6 +561,8 @@ def translate_srt_file(
     console.print(f"  Temperature: {temperature}")
     if rate_limit:
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
+    elif settings_vertex.get("use_vertex"):
+        console.print("  Rate Limit: none (Vertex dynamic shared quota)")
 
     console.print()
 

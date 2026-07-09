@@ -1,7 +1,7 @@
 import importlib.util
-import subprocess
 import logging
 import os
+import subprocess
 
 from PySubtrans.Options import SettingsType, env_float, env_int
 from PySubtrans.SettingsType import GuiSettingsType, SettingsType
@@ -19,8 +19,8 @@ else:
         from collections import defaultdict
 
         from google import genai
-        from google.genai.types import ListModelsConfig
         from google.api_core.exceptions import FailedPrecondition
+        from google.genai.types import ListModelsConfig
 
         from PySubtrans.Helpers.Localization import _
         from PySubtrans.Providers.Clients.GeminiClient import GeminiClient
@@ -93,6 +93,8 @@ else:
                                 "thinking_budget", env_int("GEMINI_THINKING_BUDGET", -1)
                             )
                             or -1,
+                            "thinking_level": settings.get_str("thinking_level")
+                            or os.getenv("GEMINI_THINKING_LEVEL"),
                             "temperature": settings.get_float(
                                 "temperature", env_float("GEMINI_TEMPERATURE", 0.0)
                             ),
@@ -232,9 +234,16 @@ else:
                                 options["thinking_budget"] = (
                                     int,
                                     _(
-                                        "Token budget for reasoning. Set to -1 for dynamic budget (up to 8k tokens)"
+                                        "Token budget for reasoning (Gemini 2.5.x). Set to -1 for dynamic budget."
                                     ),
                                 )
+
+                            options["thinking_level"] = (
+                                str,
+                                _(
+                                    "Reasoning effort for Gemini 3.x models (minimal/low/medium/high). Leave blank for the model default."
+                                ),
+                            )
 
                         else:
                             options["model"] = (
@@ -400,15 +409,6 @@ else:
                 ]
 
                 return selected_models
-
-            def _allow_multithreaded_translation(self) -> bool:
-                """
-                If user has set a rate limit don't attempt parallel requests to make sure we respect it
-                """
-                if self.settings.get_float("rate_limit", 0.0) != 0.0:
-                    return False
-
-                return True
 
     except ImportError:
         from PySubtrans.Helpers.Localization import _

@@ -207,9 +207,3 @@ class Provider_CustomServer(TranslationProvider):
             return False
 
         return True
-
-    def _allow_multithreaded_translation(self) -> bool:
-        """
-        User can decide whether to use parallel threads with their model
-        """
-        return self.settings.get_bool("supports_parallel_threads", False)

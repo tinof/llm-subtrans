@@ -90,7 +90,7 @@ default_settings = {
     # 'autosplit_incomplete': env_bool('AUTOSPLIT_INCOMPLETE', True),
     "max_lines": env_int("MAX_LINES", None),
     "max_threads": env_int("MAX_THREADS", 4),
-    "max_retries": env_int("MAX_RETRIES", 1),
+    "max_retries": env_int("MAX_RETRIES", 5),
     "max_summary_length": env_int("MAX_SUMMARY_LENGTH", 240),
     "backoff_time": env_float("BACKOFF_TIME", 3.0),
     "project_file": env_bool("PROJECT_FILE", True),

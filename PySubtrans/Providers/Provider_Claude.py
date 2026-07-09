@@ -189,15 +189,6 @@ else:
                 )
                 return options
 
-            def _allow_multithreaded_translation(self) -> bool:
-                """
-                If user has set a rate limit don't attempt parallel requests to make sure we respect it
-                """
-                if self.settings.get_float("rate_limit", 0.0) != 0.0:
-                    return False
-
-                return True
-
             def _get_claude_models(self):
                 if not self.api_key:
                     return []

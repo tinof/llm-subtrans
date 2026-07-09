@@ -190,12 +190,3 @@ class DeepSeekProvider(TranslationProvider):
             return False
 
         return True
-
-    def _allow_multithreaded_translation(self) -> bool:
-        """
-        If user has set a rate limit we can't make multiple requests at once
-        """
-        if self.settings.get_float("rate_limit", 0.0) != 0.0:
-            return False
-
-        return True

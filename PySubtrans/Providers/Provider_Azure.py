@@ -121,12 +121,6 @@ else:
 
                 return True
 
-            def _allow_multithreaded_translation(self) -> bool:
-                """
-                Assume the Aazure provider can handle multiple requests
-                """
-                return True
-
     except ImportError:
         logging.info(
             _("OpenAI SDK not installed. Azure provider will not be available")

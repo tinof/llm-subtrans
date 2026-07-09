@@ -208,12 +208,6 @@ else:
 
                 return True
 
-            def _allow_multithreaded_translation(self) -> bool:
-                """
-                Assume the Bedrock provider can handle multiple requests
-                """
-                return True
-
             def get_aws_regions(self) -> list[str]:
                 """
                 Fetches a list of AWS regions that support Bedrock from the boto3 SDK (may become out of date)

@@ -41,13 +41,6 @@ class TranslationProvider:
         name: str | None = self.settings.get_str("model")
         return name.strip() if name else None
 
-    @property
-    def allow_multithreaded_translation(self) -> bool:
-        """
-        Returns True if the provider supports multithreaded translation
-        """
-        return self._allow_multithreaded_translation()
-
     def GetAvailableModels(self) -> list[str]:
         """
         Returns a list of possible model for the provider
@@ -105,12 +98,6 @@ class TranslationProvider:
         combined_settings = SettingsType(self.settings.copy())
         combined_settings.update(overrides)
         return combined_settings
-
-    def _allow_multithreaded_translation(self) -> bool:
-        """
-        Returns True if the provider supports multithreaded translation
-        """
-        return False
 
     @classmethod
     def get_providers(cls) -> dict:
