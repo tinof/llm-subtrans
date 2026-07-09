@@ -43,7 +43,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("exsubs")
 
-GEMINI_DEFAULT_MODEL = "gemini-3.0-flash-001"
+GEMINI_DEFAULT_MODEL = "gemini-3.1-flash-lite"
 GEMINI_SCENE_THRESHOLD = 240.0
 GEMINI_MIN_BATCH_SIZE = 80
 GEMINI_MAX_BATCH_SIZE = 180

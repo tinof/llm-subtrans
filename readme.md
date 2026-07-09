@@ -8,8 +8,9 @@ This repository is a hard fork of [machinewrapped/llm-subtrans](https://github.c
 
 - **Smart Line Merging (`[MERGE]` tag):** The upstream engine strictly enforces a 1:1 translation ratio per line. This fork allows the AI to merge fragmented source lines into a single fluent line—critical for agglutinative languages (like Finnish, Turkish, or Japanese) where word order completely changes.
 - **All-in-One MKV Pipeline (`exsubs`):** Bypasses the need for external tools. Automatically extracts subtitle tracks directly from `.mkv` files, filters them, translates them, and saves the output.
-- **Parallel Translation:** Added `--parallel` mode to translate multiple subtitle batches simultaneously via `ThreadPoolExecutor`, making large jobs up to 8x faster.
-- **Large Context Mode:** Built to utilize the massive context windows of modern models (like Gemini 1.5/2.0). It feeds the AI thousands of tokens of story history to drastically improve character consistency and tone over long movies.
+- **Parallel Translation:** `--parallel` mode translates multiple subtitle batches simultaneously via `ThreadPoolExecutor` (auto-enabled with 8 workers for modern Gemini models), making large jobs up to 8x faster.
+- **Large Context Mode:** Built to utilize the massive context windows of modern models (like Gemini 2.5/3.x). It feeds the AI thousands of tokens of story history to drastically improve character consistency and tone over long movies.
+- **Resilient API Handling:** Transient provider errors (429/5xx) are retried with jittered exponential backoff; on Vertex AI (dynamic shared quota) no artificial client-side RPM limit is applied.
 - **CLI-Native Modern Stack:** No PySide6, no Windows hooks, no PyInstaller scripts. Built entirely around [`uv`](https://docs.astral.sh/uv/) for incredibly fast dependency and environment management.
 - **Direct Subtitle Workflow (`transubs`):** Efficient, highly-tuned SRT/ASS/VTT translation script for when you don't need MKV extraction.
   
@@ -45,7 +46,7 @@ exsubs --gemini -l Finnish
 exsubs video.mkv --gpt -l Spanish -i
 ```
 
-**Defaults**: Uses Vertex AI Gemini 2.5 Pro. Optimized for 1M context window. Automatically enables parallel translation for modern Gemini models.
+**Defaults**: Uses Gemini via Vertex AI (default model: `gemini-3.1-flash-lite`, override with `GEMINI_MODEL`). Optimized for 1M context window. Automatically enables parallel translation for modern Gemini models.
 
 #### `exsubs` Options
 
@@ -116,10 +117,11 @@ llm-subtrans --auto -l Japanese subtitle.srt
 Settings are managed via environment variables or `.env` file. Common overrides:
 
 ```sh
-export GEMINI_USE_VERTEX=true       # Use Vertex AI (default for exsubs)
-export GEMINI_MODEL=gemini-2.5-pro  # Specific model
-export SCENE_THRESHOLD=300          # Merge lines closer than 300s (for large context)
-export MAX_BATCH_SIZE=600           # Max lines per batch
+export GEMINI_USE_VERTEX=true             # Use Vertex AI (default for exsubs)
+export GEMINI_MODEL=gemini-3.1-flash-lite # Specific model
+export SCENE_THRESHOLD=300                # Start a new scene when the gap between lines exceeds 300s (large context)
+export MAX_BATCH_SIZE=600                 # Max lines per batch
+export MAX_RETRIES=5                      # Retries for transient API errors (default: 5)
 ```
 
 **Vertex AI Setup**: Run `exsubs --setup-vertex` for a guided configuration wizard.
