@@ -11,6 +11,7 @@ This repository is a hard fork of [machinewrapped/llm-subtrans](https://github.c
 - **Parallel Translation:** `--parallel` mode translates multiple subtitle batches simultaneously via `ThreadPoolExecutor` (auto-enabled with 8 workers for modern Gemini models), making large jobs up to 8x faster.
 - **Large Context Mode:** Built to utilize the massive context windows of modern models (like Gemini 2.5/3.x). It feeds the AI thousands of tokens of story history to drastically improve character consistency and tone over long movies.
 - **Resilient API Handling:** Transient provider errors (429/5xx) are retried with jittered exponential backoff; on Vertex AI (dynamic shared quota) no artificial client-side RPM limit is applied.
+- **Readability-Aware Translation:** Each line in the prompt carries its display time and a character budget (`#123 [2.4s, max 36 chars]`, derived from a 15 CPS target), so the model condenses lines that would be unreadable instead of translating word-for-word. The Finnish instructions also have the model infer dialogue dashes for two-speaker cues — sources like Channel 4 ship none.
 - **CLI-Native Modern Stack:** No PySide6, no Windows hooks, no PyInstaller scripts. Built entirely around [`uv`](https://docs.astral.sh/uv/) for incredibly fast dependency and environment management.
 - **Direct Subtitle Workflow (`transubs`):** Efficient, highly-tuned SRT/ASS/VTT translation script for when you don't need MKV extraction.
   
@@ -46,7 +47,19 @@ exsubs --gemini -l Finnish
 exsubs video.mkv --gpt -l Spanish -i
 ```
 
-**Defaults**: Uses Gemini via Vertex AI (default model: `gemini-3.1-flash-lite`, override with `GEMINI_MODEL`). Optimized for 1M context window. Automatically enables parallel translation for modern Gemini models.
+**Defaults**: Uses Gemini via Vertex AI (default model: `gemini-3.1-flash-lite`, override with `GEMINI_MODEL`). Optimized for 1M context window. Automatically enables parallel translation for modern Gemini models. Temperature defaults to 1.0 on Gemini 3.x (lowering it causes repetition loops) and 0.3 elsewhere; override with `LLM_TEMPERATURE`.
+
+**Finnish post-processing**: after translation, `exsubs` runs
+[sisusub](https://github.com/tinof/sisusub)'s `fix-finnish-subs` once with
+`--width-limit 42 --max-cps 17 --cps-target 15` (deterministic layout/timing
+fixes plus an AI review pass; set `SISUSUB_AI_MODEL` to run the review on a
+stronger model than the translator). A readability report is written next to
+the output; set `EXSUBS_FIXER_VERBOSE=1` for per-proposal logging. Measure any
+result objectively with:
+
+```sh
+uv run python tools/subtitle_metrics.py translated.fi.srt --source english.srt
+```
 
 #### `exsubs` Options
 
@@ -122,6 +135,9 @@ export GEMINI_MODEL=gemini-3.1-flash-lite # Specific model
 export SCENE_THRESHOLD=300                # Start a new scene when the gap between lines exceeds 300s (large context)
 export MAX_BATCH_SIZE=600                 # Max lines per batch
 export MAX_RETRIES=5                      # Retries for transient API errors (default: 5)
+export LLM_TEMPERATURE=0.3                # Override the model-aware temperature default
+export SISUSUB_AI_MODEL=gemini-3.1-pro-preview  # Stronger model for the fix-finnish-subs review pass
+export EXSUBS_FIXER_VERBOSE=1             # Verbose fix-finnish-subs output (dropped-proposal logging)
 ```
 
 **Vertex AI Setup**: Run `exsubs --setup-vertex` for a guided configuration wizard.

@@ -118,6 +118,46 @@ All of the above are also available as `make` targets:
 - Always run `make check` and `make test` before finishing a task.
 - If needed for compatibility validation, run `uv run python tests/unit_tests.py`.
 
+## Finnish Readability Pipeline (development notes)
+
+The `exsubs`/`transubs` → `fix-finnish-subs` pipeline enforces a readability
+budget end-to-end. The wiring is subtle and has silently broken before — keep
+these contracts intact:
+
+- **`init_options(**settings)`, never `Options(settings)`, in scripts.** Only
+  `init_options` calls `LoadInstructions`; constructing `Options` directly
+  silently falls back to the generic English instructions while the console
+  still prints the Finnish path. Both scripts print a `Loaded:` excerpt of the
+  resolved instructions — keep that visible.
+- **The postprocess key is `postprocess_translation`** (read by
+  `SubtitleTranslator`), not `postprocess_subtitles`. Preprocessing must be
+  invoked explicitly via `preprocess_subtitles(project.subtitles, options)` —
+  the project-settings flag is filtered out by `UpdateProjectSettings`.
+- **New `Options` keys must be registered in `Options.default_settings`** —
+  `GetSettings()` filters to known keys, so an unregistered key never reaches
+  the translation client. (`include_line_timings` and `target_cps` exist for
+  this reason.)
+- **Timing annotations and the parser are a matched pair.** The line template
+  emits `#123 [2.4s, max 36 chars]`; `TranslationParser`'s `default_pattern`
+  and `fallback_patterns[0..4]` tolerate trailing text after `#N` because
+  models echo the header. `fallback_patterns[5]` is deliberately strict — do
+  not relax it (it rescues translations placed on the number line).
+- **Keep the budget consistent in three places:** the prompt annotation
+  (15 CPS, cap `2 × 42` chars), `instructions/instructions_fi.txt` (which
+  explains the annotation, the 2-line/42-char limits, and dialogue-dash
+  inference), and the `fix-finnish-subs` flags in `exsubs.py`
+  (`--width-limit 42 --max-cps 17 --cps-target 15`).
+- **Run `fix-finnish-subs` exactly once** — its fixer chain is not idempotent
+  (merges chain further, gap fixing re-shifts timings). Do not reintroduce a
+  retry loop.
+- **Temperature policy:** Gemini 3.x stays at 1.0 (documented repetition-loop
+  risk when lowered); other providers default to 0.3. `GEMINI_3_MODEL_PATTERN`
+  in both scripts — change both or neither.
+- **Measure, don't eyeball:** `tools/subtitle_metrics.py` reports raw-character
+  line lengths, CPS, display times, dialogue-dash counts, and cue-count delta
+  vs the source. Run it before/after on a real episode for any change touching
+  translation quality, and compare against the kept baseline artifacts.
+
 ## Information
 
 Consult `docs/architecture.md` for detailed information on the project architecture and components.
