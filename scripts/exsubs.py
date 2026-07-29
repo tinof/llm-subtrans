@@ -30,8 +30,12 @@ from PySubtrans.MKV import (
     run_diagnostics,
 )
 
-from PySubtrans import init_translator
-from PySubtrans.Options import Options
+from PySubtrans import (
+    batch_subtitles,
+    init_options,
+    init_translator,
+    preprocess_subtitles,
+)
 from PySubtrans.SubtitleProject import SubtitleProject
 
 # Configure rich console and logging
@@ -60,6 +64,14 @@ FLASH_MAX_BATCH_SIZE = 220
 LANGUAGE_SUFFIX_PATTERN = regex.compile(
     r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE
 )
+
+# Gemini 3.x and later should be left at the default temperature
+GEMINI_3_MODEL_PATTERN = regex.compile(r"gemini-[3-9]", regex.IGNORECASE)
+
+# Readability limits handed to fix-finnish-subs, matching the translation prompt budget
+FINNISH_FIXER_WIDTH_LIMIT = 42
+FINNISH_FIXER_MAX_CPS = 17.0
+FINNISH_FIXER_TARGET_CPS = 15.0
 
 
 def _looks_like_language_suffix(suffix: str) -> bool:
@@ -136,45 +148,50 @@ def _normalise_translated_output(
     return desired_file
 
 
-def _run_finnish_subtitle_fixer(translated_file: Path) -> int:
-    """Run fix-finnish-subs once and return its exit status."""
-    result = subprocess.run(["fix-finnish-subs", str(translated_file)], check=False)
-    return result.returncode
-
-
 def _fix_finnish_subtitles(translated_file: Path) -> None:
-    """Run fix-finnish-subs on the translated subtitle file."""
+    """
+    Run fix-finnish-subs on the translated subtitle file.
+
+    This runs exactly once: the fixer chain is not idempotent (merge fixers chain further and
+    the gap fixer re-shifts timings), so re-running it on failure degrades the output.
+    """
     if not translated_file.exists():
         logger.warning(f"Cannot fix subtitles; {translated_file} does not exist")
         return
 
-    report_file = translated_file.with_stem(translated_file.stem + "_unfixed").with_suffix(".txt")
+    report_file = translated_file.with_stem(
+        translated_file.stem + "_unfixed"
+    ).with_suffix(".txt")
 
-    first_exit = _run_finnish_subtitle_fixer(translated_file)
-    if first_exit == 0:
+    command = [
+        "fix-finnish-subs",
+        str(translated_file),
+        "--report",
+        str(report_file),
+        "--width-limit",
+        str(FINNISH_FIXER_WIDTH_LIMIT),
+        "--max-cps",
+        str(FINNISH_FIXER_MAX_CPS),
+        "--cps-target",
+        str(FINNISH_FIXER_TARGET_CPS),
+    ]
+
+    if os.getenv("EXSUBS_FIXER_VERBOSE"):
+        command.append("--verbose")
+
+    result = subprocess.run(command, check=False)
+
+    if result.returncode == 0:
         logger.info(f"Fixed subtitles with fix-finnish-subs: {translated_file.name}")
-        return
-
-    logger.warning(
-        "fix-finnish-subs returned non-zero exit status %s for %s; retrying once",
-        first_exit,
-        translated_file,
-    )
-    second_exit = _run_finnish_subtitle_fixer(translated_file)
-    if second_exit == 0:
-        logger.info(
-            "Fixed subtitles with fix-finnish-subs after retry: %s",
-            translated_file.name,
+    else:
+        logger.warning(
+            "fix-finnish-subs returned non-zero exit status %s for %s",
+            result.returncode,
+            translated_file,
         )
-        return
 
-    logger.warning(
-        "fix-finnish-subs completed with remaining issues for %s (exit %s). "
-        "See report: %s",
-        translated_file,
-        second_exit,
-        report_file,
-    )
+    if report_file.exists():
+        console.print(f"  Readability report: {report_file}")
 
 
 class TranslationMetrics:
@@ -862,18 +879,41 @@ def translate_subtitles(
     elif mode == TranslationMode.DEEPSEEK:
         env_temp = os.getenv("DEEPSEEK_TEMPERATURE") or env_temp
 
+    # Gemini 3.x is documented to degrade (repetition loops) at reduced temperature, so it keeps
+    # the model default; other providers benefit from a low temperature on a format-critical task.
+    default_temperature = 1.0 if GEMINI_3_MODEL_PATTERN.search(model or "") else 0.3
+
     try:
-        temperature = float(env_temp) if env_temp else 1.0
+        temperature = float(env_temp) if env_temp else default_temperature
     except ValueError:
-        temperature = 1.0
+        temperature = default_temperature
 
     # Create PySubtrans options
     settings = {
         "provider": provider,
         "target_language": config.target_language,
         "temperature": temperature,
+        # Preprocessing is invoked explicitly below; postprocess_translation is read by
+        # SubtitleTranslator to enable the SubtitleProcessor pass over the translation.
         "preprocess_subtitles": True,
-        "postprocess_subtitles": True,
+        "postprocess_translation": True,
+        # Source cues are already well formed, so preprocessing does per-line cleanup only:
+        # merging and duration-splitting would change the cue count before the model sees
+        # the timings, and splitting re-creates the short-display-time problem.
+        "merge_line_duration": 0.0,
+        "max_line_duration": 0.0,
+        "break_long_lines": True,
+        "max_single_line_length": 42,
+        "min_single_line_length": 8,
+        "normalise_dialog_tags": True,
+        "break_dialog_on_one_line": True,
+        "whitespaces_to_newline": False,
+        # standard_filler_words is English-only, so it would not fire on the translation
+        "remove_filler_words": False,
+        # Give the model the duration and character budget for each line so it knows which
+        # lines must be condensed - it cannot compute CPS otherwise.
+        "include_line_timings": True,
+        "target_cps": 15.0,
         "model": model,
         "scene_threshold": scene_threshold,
         "min_batch_size": min_batch_size,
@@ -894,21 +934,30 @@ def translate_subtitles(
     if config.instruction_file and config.instruction_file.exists():
         settings["instruction_file"] = str(config.instruction_file)
 
-    options = Options(settings)
+    # init_options loads the instruction file - constructing Options directly leaves the
+    # instructions unset, silently falling back to the generic English defaults.
+    options = init_options(**settings)
 
     # Display model information
     console.print("\n[bold cyan]Translation Configuration:[/bold cyan]")
     console.print(f"  Provider: {provider}")
     console.print(f"  Model: {model}")
     console.print(f"  Target Language: {config.target_language}")
+    console.print(f"  Temperature: {temperature}")
     if rate_limit:
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
     elif settings_vertex.get("use_vertex"):
         console.print("  Rate Limit: none (Vertex dynamic shared quota)")
 
-    # Display instruction file info
+    # Display instruction file info, and confirm the instructions were actually loaded
     if config.instruction_file and config.instruction_file.exists():
         console.print(f"  Instructions: {config.instruction_file}")
+        loaded_instructions = options.get_str("instructions") or ""
+        summary = " ".join(loaded_instructions.split())[:60]
+        if summary:
+            console.print(f"  [dim]Loaded: {summary}...[/dim]")
+        else:
+            console.print("  [yellow]Warning: instructions failed to load[/yellow]")
     elif config.instruction_file:
         console.print(
             f"  Instructions: {config.instruction_file} [yellow](not found)[/yellow]"
@@ -923,9 +972,12 @@ def translate_subtitles(
     project.InitialiseProject(str(sub_file), str(out_file))
     project.UpdateProjectSettings(options)
 
-    # Batch subtitles for translation
-    from PySubtrans import batch_subtitles
+    # Preprocess explicitly: UpdateProjectSettings filters to DEFAULT_PROJECT_SETTINGS, so the
+    # preprocess_subtitles flag never reaches anything that acts on it.
+    if project.subtitles and project.subtitles.originals:
+        preprocess_subtitles(project.subtitles, options)
 
+    # Batch subtitles for translation
     batch_subtitles(
         project.subtitles,
         scene_threshold=scene_threshold,

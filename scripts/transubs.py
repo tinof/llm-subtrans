@@ -20,8 +20,7 @@ from PySubtrans.MKV import (
 )
 from PySubtrans.MKV.Config import MKVConfig, TranslationMode
 
-from PySubtrans import batch_subtitles, init_translator
-from PySubtrans.Options import Options
+from PySubtrans import batch_subtitles, init_options, init_translator
 from PySubtrans.SubtitleProject import SubtitleProject
 
 # Configure rich console and logging
@@ -46,6 +45,9 @@ FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
 
 LANGUAGE_SUFFIX_PATTERN = regex.compile(r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE)
+
+# Gemini 3.x and later should be left at the default temperature
+GEMINI_3_MODEL_PATTERN = regex.compile(r"gemini-[3-9]", regex.IGNORECASE)
 SEASON_EPISODE_PATTERN = regex.compile(
     r"S(\d{1,2})E(\d{1,3})"  # S01E02
     r"|(\d{1,2})x(\d{1,3})"  # 1x02
@@ -520,10 +522,15 @@ def translate_srt_file(
     elif mode == TranslationMode.DEEPSEEK:
         env_temp = os.getenv("DEEPSEEK_TEMPERATURE") or env_temp
 
+    # Gemini 3.x is documented to degrade (repetition loops) at reduced temperature, so it
+    # keeps the model default; other providers benefit from a low temperature on a
+    # format-critical task. Same policy as exsubs.
+    default_temperature = 1.0 if GEMINI_3_MODEL_PATTERN.search(model or "") else 0.3
+
     try:
-        temperature = float(env_temp) if env_temp else 1.0
+        temperature = float(env_temp) if env_temp else default_temperature
     except ValueError:
-        temperature = 1.0
+        temperature = default_temperature
 
     # Resolve effective language and instruction file via MKVConfig (same as exsubs)
     effective_language = target_language or MKVConfig().target_language
@@ -536,7 +543,17 @@ def translate_srt_file(
         "target_language": effective_language,
         "temperature": temperature,
         "preprocess_subtitles": True,
-        "postprocess_subtitles": True,
+        # postprocess_translation is the key SubtitleTranslator reads
+        "postprocess_translation": True,
+        "break_long_lines": True,
+        "max_single_line_length": 42,
+        "min_single_line_length": 8,
+        "normalise_dialog_tags": True,
+        "break_dialog_on_one_line": True,
+        "whitespaces_to_newline": False,
+        "remove_filler_words": False,
+        "include_line_timings": True,
+        "target_cps": 15.0,
         "model": model,
         "scene_threshold": scene_threshold,
         "min_batch_size": min_batch_size,
@@ -582,7 +599,9 @@ def translate_srt_file(
         # Override output language code to 'proofread' to avoid overwriting original/translated files
         lang_code = "proofread"
 
-    options = Options(settings)
+    # init_options loads the instruction file; Options() alone leaves instructions unset.
+    # Must stay after the proofread block above, which overrides instruction_file.
+    options = init_options(**settings)
 
     # Display instruction file info (if Options has one set)
     inst_file_raw = options.get("instruction_file")

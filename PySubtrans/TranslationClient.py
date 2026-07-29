@@ -102,6 +102,13 @@ class TranslationClient:
         )
         prompt.system_role = self.system_role
         prompt.prompt_template = self.prompt_template
+        prompt.include_line_timings = self.settings.get_bool(
+            "include_line_timings", False
+        )
+        prompt.max_single_line_length = (
+            self.settings.get_int("max_single_line_length") or 42
+        )
+        prompt.target_cps = self.settings.get_float("target_cps") or 15.0
         prompt.GenerateMessages(instructions, lines, context)
         return prompt
 

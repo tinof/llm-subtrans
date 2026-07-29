@@ -69,6 +69,8 @@ default_settings = {
     "max_newlines": env_int("MAX_NEWLINES", 2),
     "max_single_line_length": env_int("MAX_SINGLE_LINE_LENGTH", 44),
     "min_single_line_length": env_int("MIN_SINGLE_LINE_LENGTH", 8),
+    "include_line_timings": env_bool("INCLUDE_LINE_TIMINGS", False),
+    "target_cps": env_float("TARGET_CPS", 15.0),
     "prevent_overlapping_times": env_bool("PREVENT_OVERLAPPING_TIMES", False),
     "postprocess_translation": env_bool("POSTPROCESS_TRANSLATION", False),
     "preprocess_subtitles": env_bool("PREPROCESS_SUBTITLES", False),

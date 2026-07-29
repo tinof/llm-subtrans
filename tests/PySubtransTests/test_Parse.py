@@ -1,9 +1,12 @@
 import unittest
 from enum import Enum
 
+import regex
+
 from PySubtrans.Helpers import GetValueName, GetValueFromName
 from PySubtrans.Helpers.Parse import ParseDelayFromHeader, ParseNames
 from PySubtrans.Helpers.TestCases import LoggedTestCase
+from PySubtrans.TranslationParser import default_pattern, fallback_patterns
 
 
 class TestParseDelayFromHeader(LoggedTestCase):
@@ -107,6 +110,81 @@ class TestParseValues(LoggedTestCase):
                     result,
                     input_value=(value, names, default),
                 )
+
+
+class TestTranslationLinePatterns(LoggedTestCase):
+    """
+    The line header may carry a trailing annotation (e.g. "#12 [2.4s, max 36 chars]") when
+    include_line_timings is enabled, and models frequently echo it back in their response.
+    """
+
+    # (name, response, expected [(number, body)])
+    match_cases = [
+        ("plain", "#12\nOriginal>\nHi\nTranslation>\nHei", [("12", "Hei")]),
+        ("no_original", "#12\nTranslation>\nHei", [("12", "Hei")]),
+        ("annotated", "#12 [2.4s, max 36 chars]\nTranslation>\nHei", [("12", "Hei")]),
+        (
+            "annotated_with_original",
+            "#12 [2.4s, max 36 chars]\nOriginal>\nHi\nTranslation>\nHei",
+            [("12", "Hei")],
+        ),
+        (
+            "annotated_multiple_lines",
+            "#12 [2.4s]\nTranslation>\nEka\n#13 [1.8s]\nTranslation>\nToka",
+            [("12", "Eka"), ("13", "Toka")],
+        ),
+        (
+            "annotated_merge_tag",
+            "#12 [2.4s]\nTranslation>\n[MERGE 12+13] Yhdistetty",
+            [("12", "[MERGE 12+13] Yhdistetty")],
+        ),
+        (
+            "annotated_dialog",
+            "#12 [3.0s, max 45 chars]\nTranslation>\n- Huomenta.\n- Moi.",
+            [("12", "- Huomenta.\n- Moi.")],
+        ),
+    ]
+
+    def test_default_pattern_matches_annotated_headers(self):
+        for name, response, expected in self.match_cases:
+            with self.subTest(case=name):
+                matches = [
+                    (match.group("number"), match.group("body"))
+                    for match in regex.finditer(
+                        default_pattern, response, regex.MULTILINE
+                    )
+                ]
+                self.assertLoggedSequenceEqual(
+                    f"default_pattern matches for {name}",
+                    expected,
+                    matches,
+                    input_value=response,
+                )
+
+    def test_fallback_patterns_tolerate_annotated_headers(self):
+        """Every fallback except the last (bare number) must also survive an annotation"""
+        with_original = "#12 [2.4s, max 36 chars]\nOriginal>\nHi\nTranslation>\nHei\n\n"
+        # fallback_patterns[4] has no Original> branch, so it needs a bare response
+        without_original = "#12 [2.4s, max 36 chars]\nTranslation>\nHei\n\n"
+        for index, pattern in enumerate(fallback_patterns[:-1]):
+            response = without_original if index == 4 else with_original
+            with self.subTest(fallback=index):
+                match = regex.search(pattern, response, regex.MULTILINE)
+                self.assertLoggedIsNotNone(
+                    f"fallback_patterns[{index}] matched", match, input_value=response
+                )
+                assert match is not None
+                self.assertLoggedEqual(
+                    f"fallback_patterns[{index}] number", "12", match.group("number")
+                )
+
+    def test_number_excludes_annotation(self):
+        match = regex.search(
+            default_pattern, "#7 [1.5s, max 22 chars]\nTranslation>\nHei", regex.MULTILINE
+        )
+        self.assertLoggedIsNotNone("annotated header matched", match)
+        assert match is not None
+        self.assertLoggedEqual("captured number", "7", match.group("number"))
 
 
 if __name__ == "__main__":

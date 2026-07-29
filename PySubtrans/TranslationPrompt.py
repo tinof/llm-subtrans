@@ -6,6 +6,9 @@ from PySubtrans.SubtitleLine import SubtitleLine
 
 default_prompt_template: str = "<context>\n{context}\n</context>\n\n{prompt}\n\n<summary>Summary of the batch</summary>\n<scene>Summary of the scene</scene>\n"
 default_line_template: str = "#{number}\nOriginal>\n{text}\nTranslation>\n"
+default_line_template_with_timings: str = (
+    "#{number}{annotation}\nOriginal>\n{text}\nTranslation>\n"
+)
 default_tag_template: str = "<{tag}>{content}</{tag}>"
 default_context_tags: list[str] = [
     "description",
@@ -49,6 +52,12 @@ class TranslationPrompt:
         self.line_template: str = default_line_template
         self.tag_template: str = default_tag_template
         self.context_tags: list[str] = default_context_tags
+
+        # Annotate each line with its duration and a character budget, so the model knows
+        # which lines must be condensed - it cannot compute reading speed otherwise
+        self.include_line_timings: bool = False
+        self.max_single_line_length: int = 42
+        self.target_cps: float = 15.0
 
         self.system_prompt: str | None = None
         self.batch_prompt: str | None = None
@@ -103,8 +112,15 @@ class TranslationPrompt:
         if not lines:
             raise TranslationError("No source lines provided")
 
+        line_template = (
+            default_line_template_with_timings
+            if self.include_line_timings and self.line_template is default_line_template
+            else self.line_template
+        )
+
         source_lines: list[str | None] = [
-            _get_line_prompt(line, self.line_template) for line in lines
+            _get_line_prompt(line, line_template, self._get_line_annotation(line))
+            for line in lines
         ]
 
         real_lines = [line for line in source_lines if line is not None]
@@ -181,6 +197,23 @@ class TranslationPrompt:
         self.messages = messages
         self._generate_content()
 
+    def _get_line_annotation(self, line: SubtitleLine) -> str:
+        """
+        Describe the display time and character budget available for a line
+        """
+        if not self.include_line_timings:
+            return ""
+
+        seconds = line.duration.total_seconds()
+        if seconds <= 0:
+            return ""
+
+        # A cue may use up to two lines, so the budget is capped at twice the line length
+        budget = int(seconds * self.target_cps)
+        budget = max(16, min(budget, self.max_single_line_length * 2))
+
+        return f" [{seconds:.1f}s, max {budget} chars]"
+
     def _wrap_system_message(self, message: str) -> str:
         separator = "--------"
         return "\n".join([separator, "SYSTEM", separator, message.strip(), separator])
@@ -210,7 +243,7 @@ class TranslationPrompt:
 
 
 def _get_line_prompt(
-    line: SubtitleLine, line_template: str | None = None
+    line: SubtitleLine, line_template: str | None = None, annotation: str = ""
 ) -> str | None:
     """
     Generate a prompt for a single subtitle line
@@ -221,7 +254,10 @@ def _get_line_prompt(
     if line_template is None:
         raise TranslationError(_("No line template provided"))
 
-    return line_template.format(number=line.number, text=line.text_normalized)
+    # Templates without an {annotation} field simply ignore the surplus argument
+    return line_template.format(
+        number=line.number, text=line.text_normalized, annotation=annotation
+    )
 
 
 def _generate_tag(tag: str, content: str | list[str], tag_template: str) -> str:
