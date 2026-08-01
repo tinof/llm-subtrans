@@ -147,6 +147,19 @@ these contracts intact:
   explains the annotation, the 2-line/42-char limits, and dialogue-dash
   inference), and the `fix-finnish-subs` flags in `exsubs.py`
   (`--width-limit 42 --max-cps 17 --cps-target 15`).
+- **Line correspondence is a hard invariant.** In fast-paced scenes the model
+  used to condense across lines and silently shift content onto earlier cue
+  numbers, desyncing text from audio by up to ~35 s. Three guards keep it
+  aligned — keep all three intact: (1) `instructions_fi.txt` rule 6b mandates
+  explicit `[MERGE N+M]` (handled by `TranslationParser.MatchTranslations`,
+  which extends the cue's end time) and forbids moving content between
+  numbers; (2) `merge_continuation_duration`/`merge_continuation_gap`
+  (1.5/0.3 in both scripts) pre-merge rapid-fire continuation fragments —
+  text and timing atomically — in `SubtitleProcessor` before the model sees
+  them; (3) `max_translation_cps` (25.0 in both scripts) makes
+  `SubtitleValidator` raise `ReadingSpeedError` so over-budget lines (the
+  drift signature) trigger a batch retry. Lines of ≤16 raw chars are exempt,
+  matching the prompt annotation's budget floor.
 - **Run `fix-finnish-subs` exactly once** — its fixer chain is not idempotent
   (merges chain further, gap fixing re-shifts timings). Do not reintroduce a
   retry loop.

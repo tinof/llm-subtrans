@@ -897,11 +897,19 @@ def translate_subtitles(
         # SubtitleTranslator to enable the SubtitleProcessor pass over the translation.
         "preprocess_subtitles": True,
         "postprocess_translation": True,
-        # Source cues are already well formed, so preprocessing does per-line cleanup only:
-        # merging and duration-splitting would change the cue count before the model sees
-        # the timings, and splitting re-creates the short-display-time problem.
+        # Source cues are already well formed, so preprocessing does per-line cleanup plus
+        # continuation merging only: blind short-line merging and duration-splitting would
+        # change cue structure unsafely, and splitting re-creates short display times.
         "merge_line_duration": 0.0,
         "max_line_duration": 0.0,
+        # Rapid-fire fragments of one sentence are merged (text + timing atomically) before
+        # translation, so each numbered line has a budget the model can actually meet.
+        # Otherwise the model condenses across lines itself and desynchronises the timings.
+        "merge_continuation_duration": 1.5,
+        "merge_continuation_gap": 0.3,
+        # Reject batches where a translation blows its display-time budget - the signature
+        # of content shifted onto the wrong line number - and retry them.
+        "max_translation_cps": 25.0,
         "break_long_lines": True,
         "max_single_line_length": 42,
         "min_single_line_length": 8,

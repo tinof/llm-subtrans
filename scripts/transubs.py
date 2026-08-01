@@ -20,7 +20,12 @@ from PySubtrans.MKV import (
 )
 from PySubtrans.MKV.Config import MKVConfig, TranslationMode
 
-from PySubtrans import batch_subtitles, init_options, init_translator
+from PySubtrans import (
+    batch_subtitles,
+    init_options,
+    init_translator,
+    preprocess_subtitles,
+)
 from PySubtrans.SubtitleProject import SubtitleProject
 
 # Configure rich console and logging
@@ -554,6 +559,13 @@ def translate_srt_file(
         "remove_filler_words": False,
         "include_line_timings": True,
         "target_cps": 15.0,
+        # Merge rapid-fire fragments of one sentence (text + timing atomically) before
+        # translation, so each numbered line has a budget the model can actually meet.
+        "merge_continuation_duration": 1.5,
+        "merge_continuation_gap": 0.3,
+        # Reject batches where a translation blows its display-time budget - the signature
+        # of content shifted onto the wrong line number - and retry them.
+        "max_translation_cps": 25.0,
         "model": model,
         "scene_threshold": scene_threshold,
         "min_batch_size": min_batch_size,
@@ -618,6 +630,11 @@ def translate_srt_file(
     desired_path = _build_translated_output_path(sub_file, lang_code)
     project.InitialiseProject(str(sub_file), str(desired_path))
     project.UpdateProjectSettings(options)
+
+    # Preprocess explicitly: UpdateProjectSettings filters to DEFAULT_PROJECT_SETTINGS, so the
+    # preprocess_subtitles flag never reaches anything that acts on it.
+    if project.subtitles and project.subtitles.originals:
+        preprocess_subtitles(project.subtitles, options)
 
     # Batch subtitles into scenes (required before translation)
     if project.subtitles:

@@ -7,6 +7,7 @@ from PySubtrans.SubtitleError import (
     UnmatchedLinesError,
     EmptyLinesError,
     LineTooLongError,
+    ReadingSpeedError,
     TooManyNewlinesError,
     UntranslatedLinesError,
 )
@@ -137,3 +138,61 @@ class TestSubtitleValidator(LoggedTestCase):
         )
         self.assertIn(LineTooLongError, error_types)
         self.assertIn(UntranslatedLinesError, error_types)
+
+    def test_ValidateTranslations_reading_speed(self):
+        options = Options({"max_translation_cps": 25.0})
+        validator = SubtitleValidator(options)
+
+        # 42 raw characters in 1.1 seconds is ~38 cps - the signature of content
+        # shifted onto the wrong line number
+        line_too_fast = SubtitleLine(
+            {
+                "number": 1,
+                "start": "00:00:00,000",
+                "end": "00:00:01,100",
+                "text": "Puolue on vapaa sijoittamaan minne haluaa.",
+            }
+        )
+        # 40 characters in 2 seconds is 20 cps - within the limit
+        line_ok = SubtitleLine(
+            {
+                "number": 2,
+                "start": "00:00:02,000",
+                "end": "00:00:04,000",
+                "text": "0123456789012345678901234567890123456789",
+            }
+        )
+        # Above the limit but within the 16-character grace allowance for short cues
+        line_short_grace = SubtitleLine(
+            {
+                "number": 3,
+                "start": "00:00:05,000",
+                "end": "00:00:05,500",
+                "text": "Hei sitten!",
+            }
+        )
+
+        errors = validator.ValidateTranslations(
+            [line_too_fast, line_ok, line_short_grace]
+        )
+        self.assertLoggedEqual("error_count", 1, len(errors))
+        self.assertLoggedIsInstance("error type", errors[0], ReadingSpeedError)
+        error = errors[0]
+        assert isinstance(error, ReadingSpeedError)
+        self.assertLoggedEqual("flagged lines", [line_too_fast], error.lines)
+
+    def test_ValidateTranslations_reading_speed_disabled_by_default(self):
+        validator = SubtitleValidator(Options())
+
+        line_too_fast = SubtitleLine(
+            {
+                "number": 1,
+                "start": "00:00:00,000",
+                "end": "00:00:01,100",
+                "text": "Puolue on vapaa sijoittamaan minne haluaa.",
+            }
+        )
+
+        errors = validator.ValidateTranslations([line_too_fast])
+        self.assertLoggedEqual("error_count", 0, len(errors))
+

@@ -59,6 +59,12 @@ class SubtitleProcessor:
         self.merge_line_duration: timedelta = settings.get_timedelta(
             "merge_line_duration", timedelta(seconds=0)
         )
+        self.merge_continuation_duration: timedelta = settings.get_timedelta(
+            "merge_continuation_duration", timedelta(seconds=0)
+        )
+        self.merge_continuation_gap: timedelta = settings.get_timedelta(
+            "merge_continuation_gap", timedelta(seconds=0.3)
+        )
         self.min_gap: timedelta = settings.get_timedelta(
             "min_gap", timedelta(seconds=0.05)
         )
@@ -116,6 +122,9 @@ class SubtitleProcessor:
 
         if self.merge_line_duration.total_seconds() > 0.0:
             lines = self._merge_short_lines(lines, self.merge_line_duration)
+
+        if self.merge_continuation_duration.total_seconds() > 0.0:
+            lines = self._merge_continuation_lines(lines)
 
         for line in lines:
             line.number = line_number
@@ -371,6 +380,84 @@ class SubtitleProcessor:
 
         merged_lines.append(current_line)
         return merged_lines
+
+    def _merge_continuation_lines(
+        self, lines: list[SubtitleLine]
+    ) -> list[SubtitleLine]:
+        """
+        Merge rapid-fire continuation cues into the preceding cue.
+
+        In fast-paced dialogue a single sentence is often split across several very short
+        cues, leaving each fragment with an impossible character budget for translation.
+        Merging text and timing together (before the model sees the cues) preserves the
+        1:1 line correspondence that keeps translations in sync with the audio.
+
+        A cue is only absorbed when it plausibly continues the previous cue: the previous
+        text does not end a sentence, the gap between cues is small, neither cue is a
+        two-speaker dialogue cue, and the merged cue stays within sane display limits.
+        """
+        if not lines:
+            return []
+
+        max_merged_duration = timedelta(seconds=6)
+        max_merged_length = self.max_single_line_length * 2
+
+        merged_lines: list[SubtitleLine] = []
+        current_line: SubtitleLine = lines[0]
+
+        for line in lines[1:]:
+            if self._is_continuation(current_line, line, max_merged_duration, max_merged_length):
+                current_line.text = f"{current_line.text} {line.text}"
+                current_line.end = line.end
+            else:
+                merged_lines.append(current_line)
+                current_line = line
+
+        merged_lines.append(current_line)
+        return merged_lines
+
+    def _is_continuation(
+        self,
+        current_line: SubtitleLine,
+        line: SubtitleLine,
+        max_merged_duration: timedelta,
+        max_merged_length: int,
+    ) -> bool:
+        """
+        Decide whether a cue should be absorbed into the previous cue as a continuation
+        """
+        if not current_line.text_normalized or not line.text_normalized:
+            return False
+
+        if line.duration >= self.merge_continuation_duration:
+            return False
+
+        if current_line.text_normalized[-1] in sentence_end_punctuation:
+            return False
+
+        if self.dialog_marker in current_line.text or self.dialog_marker in line.text:
+            return False
+
+        if (
+            current_line.start is None
+            or current_line.end is None
+            or line.start is None
+            or line.end is None
+        ):
+            return False
+
+        gap = line.start - current_line.end
+        if gap > self.merge_continuation_gap:
+            return False
+
+        if line.end - current_line.start > max_merged_duration:
+            return False
+
+        merged_length = len(current_line.text) + len(line.text) + 1
+        if merged_length > max_merged_length:
+            return False
+
+        return True
 
     def _compile_split_sequences(self):
         self._compiled_split_sequences = [

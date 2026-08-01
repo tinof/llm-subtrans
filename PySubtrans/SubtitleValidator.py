@@ -3,6 +3,7 @@ from PySubtrans.SubtitleBatch import SubtitleBatch
 from PySubtrans.SubtitleError import (
     EmptyLinesError,
     LineTooLongError,
+    ReadingSpeedError,
     TooManyNewlinesError,
     UnmatchedLinesError,
     UntranslatedLinesError,
@@ -44,11 +45,15 @@ class SubtitleValidator:
 
         max_characters: int = self.options.get_int("max_characters") or 1000
         max_newlines: int = self.options.get_int("max_newlines") or 10
+        max_translation_cps: float = (
+            self.options.get_float("max_translation_cps") or 0.0
+        )
 
         no_number: list[SubtitleLine] = []
         no_text: list[SubtitleLine] = []
         too_long: list[SubtitleLine] = []
         too_many_newlines: list[SubtitleLine] = []
+        too_fast: list[SubtitleLine] = []
 
         for line in translated:
             if not line.number:
@@ -63,6 +68,17 @@ class SubtitleValidator:
 
             if line.text.count("\n") > max_newlines:
                 too_many_newlines.append(line)
+
+            if max_translation_cps > 0.0:
+                # Raw character count (spaces included, line breaks not) is the metric
+                # subtitle players and downstream fixers use for reading speed
+                char_count = len(line.text.replace("\n", ""))
+                seconds = line.duration.total_seconds() if line.duration else 0.0
+                # Very short cues get a grace allowance, matching the prompt annotation
+                # budget floor of 16 characters
+                if seconds > 0.0 and char_count > 16:
+                    if char_count / seconds > max_translation_cps:
+                        too_fast.append(line)
 
         errors = []
 
@@ -94,6 +110,15 @@ class SubtitleValidator:
                 TooManyNewlinesError(
                     f"One or more lines contain more than {max_newlines} newlines",
                     lines=too_many_newlines,
+                )
+            )
+
+        if too_fast:
+            errors.append(
+                ReadingSpeedError(
+                    f"{len(too_fast)} translations exceed {max_translation_cps:.0f} "
+                    "characters per second for their display time",
+                    lines=too_fast,
                 )
             )
 

@@ -117,6 +117,16 @@ class TooManyNewlinesError(TranslationValidationError):
         super().__init__(message, lines=lines, translation=translation)
 
 
+class ReadingSpeedError(TranslationValidationError):
+    def __init__(
+        self,
+        message: str,
+        lines: list[Any] | None = None,
+        translation: Any | None = None,
+    ):
+        super().__init__(message, lines=lines, translation=translation)
+
+
 class LineTooLongError(TranslationValidationError):
     def __init__(
         self,

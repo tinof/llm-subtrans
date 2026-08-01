@@ -41,6 +41,27 @@ Jokaisen rivin tunniste sisältää sen näyttöajan ja merkkibudjetin tässä m
 
 (25 merkkiä, budjetti 27 – mahtuu. Sanatarkka käännös olisi ollut yli 60 merkkiä.)
 
+**6b. RIVIVASTAAVUUS JA NOPEA DIALOGI (EHDOTON SÄÄNTÖ):**
+
+Jokainen numeroitu käännös saa sisältää VAIN oman lähderivinsä (`#N`) merkityksen. Älä KOSKAAN siirrä osaa repliikistä viereisen numeron alle tai jatka edellisen rivin ajatusta seuraavan numeron kohdalla — jokaisen rivin ajastus on sidottu numeroon, joten sisällön siirtäminen vie tekstityksen pysyvästi eri tahtiin puheen kanssa. Tämä sääntö on tärkeämpi kuin merkkibudjetti: mieluummin budjetin ylittävä käännös oikealla rivillä kuin sisältöä väärällä rivillä.
+
+Jos nopeatempoisessa kohtauksessa saman puhujan lause on pätkitty usealle lyhyelle riville, eikä merkitys mahdu budjettiin edes rohkeasti tiivistämällä, yhdistä peräkkäiset rivit EKSPLISIITTISESTI `[MERGE ID+ID]`-merkinnällä:
+
+    #211 [1.9s, max 28 chars]
+    Original>
+    you would recommend your father-in-law's hedge fund
+    #212 [1.1s, max 16 chars]
+    Original>
+    in Shanghai?
+    Translation>
+    [MERGE 211+212] Suosittelisitko appesi Shanghain-rahastoa?
+
+Säännöt yhdistämiselle:
+- Yhdistä vain SAMAN PUHUJAN peräkkäisiä rivejä, jotka muodostavat yhden ajatuksen.
+- Kirjoita yhdistetty käännös ensimmäisen rivin numerolle ja jätä yhdistetyt rivit (esim. `#212`) vastauksesta KOKONAAN pois.
+- Yhdistetyn repliikin budjetti on rivien yhteenlaskettu näyttöaika — pysy silti enintään kahdessa rivissä.
+- Käytä yhdistämistä säästeliäästi: vain kun budjetti on muuten mahdoton. Älä koskaan yhdistä hiljaisesti ilman `[MERGE]`-merkintää.
+
 **7. RIVITYS:**
 - Repliikissä saa olla **enintään kaksi riviä**.
 - Yksittäinen rivi saa olla enintään **42 merkkiä** leveä. Jos käännös on pidempi, jaa se kahdelle riville `\n`-merkillä.
@@ -77,7 +98,7 @@ Kun käännät jokaista riviä, toimi seuraavasti: tunnista ensin mahdolliset id
 
 **VASTAUSFORMAATTI (ERITTÄIN TÄRKEÄ):**
 
-Vastauksesi käsitellään automaattisesti, joten sinun TÄYTYY noudattaa tätä formaattia TÄSMÄLLEEN. Käännöksessä on oltava TÄSMÄLLEEN SAMA MÄÄRÄ RIVEJÄ kuin alkuperäisessä.
+Vastauksesi käsitellään automaattisesti, joten sinun TÄYTYY noudattaa tätä formaattia TÄSMÄLLEEN. Jokaisella alkuperäisellä rivinumerolla on oltava oma käännös samalla numerolla — ainoa poikkeus ovat `[MERGE]`-merkinnällä yhdistetyt rivit, jotka jätetään pois (ks. sääntö 6b).
 
 Lisää ennen käännöksiä `<summary>`- ja `<scene>`-tagit, jotka sisältävät yhteenvedot suomeksi:
 
@@ -118,11 +139,27 @@ Translation>
 - Löysitkö sen?
 - En vielä.
 
+Esimerkki 4 (Nopea dialogi, rivien yhdistäminen):
+
+#500 [1.6s, max 24 chars]
+Original>
+As I said, I'm here to negotiate this contract
+#501 [1.3s, max 19 chars]
+Original>
+between our great nations.
+Translation>
+[MERGE 500+501] Neuvottelen sopimuksesta
+maidemme välillä.
+
+(Rivi #501 jätetään pois, koska se yhdistettiin riviin #500.)
+
 ### retry_instructions
 Edellinen käännös epäonnistui, koska se ei noudattanut formaattisääntöjä.
 
 Käännä tekstitykset uudelleen ja varmista, että noudatat seuraavia sääntöjä TARKASTI:
 *   Jokaisella alkuperäisellä rivillä on oltava oma käännös, ja rivien numerointi (`#ID`) on säilytettävä.
+*   Jokainen numeroitu käännös saa sisältää vain oman lähderivinsä merkityksen — älä siirrä sisältöä viereisen numeron alle.
+*   Jos käännös ei mahdu rivin näyttöaikaan (liian monta merkkiä sekunnissa), tiivistä sitä tai yhdistä rivi seuraavaan `[MERGE]`-merkinnällä.
 *   Älä yhdistä rivejä, ellei se ole kieliopillisesti välttämätöntä.
 *   Jos englanninkielinen lause on pätkitty usealle lyhyelle riville, voit YHDISTÄÄ ne yhdeksi sujuvaksi suomenkieliseksi riviksi tunnisteella `[MERGE ID+NEXT_ID]`.
 *   Noudata edelleen merkkibudjettia, enintään kahta riviä ja 42 merkin rivipituutta.
