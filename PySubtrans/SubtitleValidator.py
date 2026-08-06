@@ -1,7 +1,10 @@
+import regex
+
 from PySubtrans.Options import Options
 from PySubtrans.SubtitleBatch import SubtitleBatch
 from PySubtrans.SubtitleError import (
     EmptyLinesError,
+    LeakedAnnotationError,
     LineTooLongError,
     ReadingSpeedError,
     TooManyNewlinesError,
@@ -9,6 +12,13 @@ from PySubtrans.SubtitleError import (
     UntranslatedLinesError,
 )
 from PySubtrans.SubtitleLine import SubtitleLine
+
+# Deliberately looser than the sanitiser in Helpers.Text, which strips the well-formed
+# annotation: this only needs the prefix, so mangled repetitions are caught too. No natural
+# subtitle text contains "[<number>s, max <number>".
+leaked_annotation_pattern = regex.compile(
+    r"\[\s*\d+(?:[.,]\d+)?\s*s\s*,\s*max\s+\d+", regex.IGNORECASE
+)
 
 
 class SubtitleValidator:
@@ -54,6 +64,7 @@ class SubtitleValidator:
         too_long: list[SubtitleLine] = []
         too_many_newlines: list[SubtitleLine] = []
         too_fast: list[SubtitleLine] = []
+        leaked_annotations: list[SubtitleLine] = []
 
         for line in translated:
             if not line.number:
@@ -68,6 +79,9 @@ class SubtitleValidator:
 
             if line.text.count("\n") > max_newlines:
                 too_many_newlines.append(line)
+
+            if leaked_annotation_pattern.search(line.text):
+                leaked_annotations.append(line)
 
             if max_translation_cps > 0.0:
                 # Raw character count (spaces included, line breaks not) is the metric
@@ -110,6 +124,15 @@ class SubtitleValidator:
                 TooManyNewlinesError(
                     f"One or more lines contain more than {max_newlines} newlines",
                     lines=too_many_newlines,
+                )
+            )
+
+        if leaked_annotations:
+            errors.append(
+                LeakedAnnotationError(
+                    f"{len(leaked_annotations)} translations repeat the timing annotation "
+                    "from the prompt - it is guidance only and must never appear in a translation",
+                    lines=leaked_annotations,
                 )
             )
 

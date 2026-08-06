@@ -15,6 +15,16 @@ standard_filler_words = (
 
 whitespace_and_punctuation_pattern = regex.compile(r"[\p{P}\p{Z}\p{C}]")
 
+# Timing budget annotations from the prompt line headers (e.g. "[2.4s, max 36 chars]") which
+# models sometimes echo into the translation body. The closing bracket and the tail of "chars"
+# are optional because the annotation is often mangled when it is repeated.
+timing_annotation_pattern = regex.compile(
+    r"\[\s*\d+(?:[.,]\d+)?\s*s\s*,\s*max\s+\d+\s*char\w*\s*\]?", regex.IGNORECASE
+)
+
+# A line consisting only of whitespace and dialog dashes carries no content of its own
+empty_after_annotation_pattern = regex.compile(r"[\s\-–—]*")
+
 priority_break_sequences = [
     regex.escape(dialog_marker),  # Dialog marker
     r"(?=\([^)]*\)|\[[^\]]*\])",  # Look ahead to find a complete parenthetical or bracketed block to split before
@@ -106,6 +116,32 @@ def ConvertWhitespaceBlocksToNewlines(text: str) -> str:
         text = regex.sub(r" {3,}|\，\s*", "\n", text)
 
     return text
+
+
+def RemoveTimingAnnotations(text: str | None) -> str | None:
+    """
+    Strip timing budget annotations that a model has echoed into a translation.
+
+    Lines that contain nothing but an annotation are removed entirely, otherwise the
+    annotation is cut out and the remaining text on the line is preserved.
+    """
+    if not text or "[" not in text:
+        return text
+
+    # Matched against the whole text rather than line by line, because a model that wraps
+    # a long line can split the annotation across a newline
+    remainder = timing_annotation_pattern.sub("", text)
+
+    if remainder == text:
+        return text
+
+    lines: list[str] = [
+        regex.sub(r" {2,}", " ", line).strip()
+        for line in remainder.split("\n")
+        if not empty_after_annotation_pattern.fullmatch(line)
+    ]
+
+    return "\n".join(lines)
 
 
 def ConvertWideDashesToStandardDashes(text: str) -> str:

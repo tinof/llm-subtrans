@@ -6,7 +6,14 @@ import regex
 from PySubtrans.Helpers import GetValueName, GetValueFromName
 from PySubtrans.Helpers.Parse import ParseDelayFromHeader, ParseNames
 from PySubtrans.Helpers.TestCases import LoggedTestCase
-from PySubtrans.TranslationParser import default_pattern, fallback_patterns
+from PySubtrans.Instructions import DEFAULT_TASK_TYPE
+from PySubtrans.Options import Options
+from PySubtrans.Translation import Translation
+from PySubtrans.TranslationParser import (
+    TranslationParser,
+    default_pattern,
+    fallback_patterns,
+)
 
 
 class TestParseDelayFromHeader(LoggedTestCase):
@@ -185,6 +192,42 @@ class TestTranslationLinePatterns(LoggedTestCase):
         self.assertLoggedIsNotNone("annotated header matched", match)
         assert match is not None
         self.assertLoggedEqual("captured number", "7", match.group("number"))
+
+
+class TestTranslationParserSanitisation(LoggedTestCase):
+    """Timing annotations echoed into the body must never reach the translation"""
+
+    def _parse(self, response: str) -> dict[int, str]:
+        parser = TranslationParser(DEFAULT_TASK_TYPE, Options())
+        parser.ProcessTranslation(Translation({"text": response}), validate=False)
+        return {sub.number: sub.text for sub in parser.translations.values()}
+
+    def test_annotation_after_translation_marker(self):
+        response = (
+            "#123\nOriginal>\nThe other doctors died -\n"
+            "Translation>\n[2.0s, max 29 chars]\nMuut lääkärit kuolivat -\n"
+        )
+        translations = self._parse(response)
+        self.assertLoggedEqual(
+            "sanitised body", "Muut lääkärit kuolivat -", translations[123]
+        )
+
+    def test_annotation_without_markers(self):
+        response = "#123\n[2.0s, max 29 chars]\nMuut lääkärit kuolivat -\n"
+        translations = self._parse(response)
+        self.assertLoggedEqual(
+            "sanitised body", "Muut lääkärit kuolivat -", translations[123]
+        )
+
+    def test_annotation_inline_with_text(self):
+        response = "#7\nTranslation>\n[2.7s, max 40 chars] ja joudun\n"
+        translations = self._parse(response)
+        self.assertLoggedEqual("sanitised body", "ja joudun", translations[7])
+
+    def test_annotation_on_header_line_is_ignored(self):
+        response = "#7 [1.5s, max 22 chars]\nTranslation>\nHei maailma.\n"
+        translations = self._parse(response)
+        self.assertLoggedEqual("unaffected body", "Hei maailma.", translations[7])
 
 
 if __name__ == "__main__":

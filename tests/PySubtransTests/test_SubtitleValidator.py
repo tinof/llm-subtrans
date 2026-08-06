@@ -10,6 +10,7 @@ from PySubtrans.SubtitleError import (
     ReadingSpeedError,
     TooManyNewlinesError,
     UntranslatedLinesError,
+    LeakedAnnotationError,
 )
 
 
@@ -196,3 +197,24 @@ class TestSubtitleValidator(LoggedTestCase):
         errors = validator.ValidateTranslations([line_too_fast])
         self.assertLoggedEqual("error_count", 0, len(errors))
 
+class TestLeakedAnnotationValidation(LoggedTestCase):
+    def _validate(self, text: str) -> list[Exception]:
+        validator = SubtitleValidator(Options())
+        line = SubtitleLine(
+            {
+                "number": 1,
+                "start": "00:00:00,000",
+                "end": "00:00:02,000",
+                "text": text,
+            }
+        )
+        return validator.ValidateTranslations([line])
+
+    def test_detects_mangled_annotation(self):
+        errors = self._validate("[2.0S, max 29 cars] teksti")
+        self.assertLoggedEqual("error_count", 1, len(errors))
+        self.assertLoggedIsInstance("error type", errors[0], LeakedAnnotationError)
+
+    def test_ignores_sound_effects(self):
+        errors = self._validate("[naurua] Hyvä juttu.")
+        self.assertLoggedEqual("error_count", 0, len(errors))

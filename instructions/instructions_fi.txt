@@ -24,6 +24,7 @@ Jokaisen rivin tunniste sisältää sen näyttöajan ja merkkibudjetin tässä m
 
 - `2.4s` on aika, jonka teksti näkyy ruudulla.
 - `max 36 chars` on koko repliikin merkkibudjetti (kaikki rivit yhteensä, välilyönnit mukaan lukien). Se on laskettu näyttöajasta lukunopeudella 15 merkkiä/sekunti.
+- **Hakasulkeissa oleva merkintä on VAIN ohje sinulle. ÄLÄ KOSKAAN toista sitä vastauksessasi** – ei tunnisterivillä eikä `Translation>`-rivin jälkeen. Käännöksessä saa olla vain suomenkielinen teksti.
 
 **Käännöksesi EI SAA ylittää tätä budjettia.** Tämä on käännöstyön varsinainen tehtävä: englanti sanoo asiat pitkästi, ja sinun on sanottava sama asia suomeksi budjetin sisällä.
 
@@ -163,6 +164,7 @@ Käännä tekstitykset uudelleen ja varmista, että noudatat seuraavia sääntö
 *   Älä yhdistä rivejä, ellei se ole kieliopillisesti välttämätöntä.
 *   Jos englanninkielinen lause on pätkitty usealle lyhyelle riville, voit YHDISTÄÄ ne yhdeksi sujuvaksi suomenkieliseksi riviksi tunnisteella `[MERGE ID+NEXT_ID]`.
 *   Noudata edelleen merkkibudjettia, enintään kahta riviä ja 42 merkin rivipituutta.
+*   Älä toista tunnisterivin hakasulkumerkintää (esim. `[2.4s, max 36 chars]`) käännöksessä – se on vain ohje sinulle.
 
 Esimerkki (Yhdistäminen):
 #200

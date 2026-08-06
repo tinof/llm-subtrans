@@ -18,6 +18,7 @@ from PySubtrans.Helpers.Text import (
     Linearise,
     NormaliseDialogTags,
     RemoveFillerWords,
+    RemoveTimingAnnotations,
     RemoveWhitespaceAndPunctuation,
     SanitiseSummary,
 )
@@ -425,6 +426,47 @@ class TestTextHelpers(LoggedTestCase):
                 result = EnsureFullWidthPunctuation(text)
                 self.assertLoggedEqual(
                     "fullwidth punctuation", expected, result, input_value=text
+                )
+
+
+class TestRemoveTimingAnnotations(LoggedTestCase):
+    timing_annotation_cases = [
+        (
+            "[2.0s, max 29 chars]\nMuut lääkärit kuolivat -",
+            "Muut lääkärit kuolivat -",
+        ),
+        ("[2.7s, max 40 chars] ja joudun", "ja joudun"),
+        (
+            "- [2.2s, max 33 chars]\n- Ei hätää.",
+            "- Ei hätää.",
+        ),
+        ("- [2.2s, max 33 chars] Ei hätää.", "- Ei hätää."),
+        ("[3.4s, max 50 charst Kabir?", "Kabir?"),
+        (
+            "[1.4s, max 20 chars] <i>Siellä kristalli.</i>",
+            "<i>Siellä kristalli.</i>",
+        ),
+        ("[2.0S, MAX 29 CHARS]\nTeksti", "Teksti"),
+        # A wrapped annotation is still recognised across the line break
+        (
+            "[1.4s, max 21 chars] Aijaa. [3.8s,\nmax 57 chars] Ei nyt.",
+            "Aijaa. Ei nyt.",
+        ),
+        ("[2,0s, max 29 chars]\nTeksti", "Teksti"),
+        ("[2.0s, max 29 chars]", ""),
+        ("[naurua]", "[naurua]"),
+        ("[MERGE 12+13] Yhdistetty rivi", "[MERGE 12+13] Yhdistetty rivi"),
+        ("Tavallinen rivi", "Tavallinen rivi"),
+        ("", ""),
+        (None, None),
+    ]
+
+    def test_RemoveTimingAnnotations(self):
+        for text, expected in self.timing_annotation_cases:
+            with self.subTest(text=text):
+                result = RemoveTimingAnnotations(text)
+                self.assertLoggedEqual(
+                    "timing annotations removed", expected, result, input_value=text
                 )
 
 

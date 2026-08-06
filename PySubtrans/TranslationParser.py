@@ -7,7 +7,7 @@ from PySubtrans.Instructions import DEFAULT_TASK_TYPE
 from PySubtrans.Options import Options
 from PySubtrans.Helpers.Localization import _
 from PySubtrans.Helpers.SubtitleHelpers import MergeTranslations
-from PySubtrans.Helpers.Text import IsTextContentEqual
+from PySubtrans.Helpers.Text import IsTextContentEqual, RemoveTimingAnnotations
 from PySubtrans.SubtitleLine import SubtitleLine
 from PySubtrans.SubtitleError import (
     NoTranslationError,
@@ -135,14 +135,17 @@ class TranslationParser:
     def FindMatches(self, text, template) -> list[dict[str, str]]:
         """
         re.findall has some very unhelpful behaviour, so we use finditer instead.
+
+        Timing annotations are stripped here so that every pattern benefits, including the
+        fallbacks that capture anything following the line number.
         """
         return [
             {
-                "body": match.group("body"),
+                "body": RemoveTimingAnnotations(match.group("body")),
                 "number": match.groupdict().get("number"),
                 "start": match.groupdict().get("start"),
                 "end": match.groupdict().get("end"),
-                "original": match.groupdict().get("original"),
+                "original": RemoveTimingAnnotations(match.groupdict().get("original")),
             }
             for match in template.finditer(text)
         ]
