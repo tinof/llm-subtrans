@@ -2,6 +2,8 @@
 
 **Note:** This is a CLI-only fork for Linux/macOS. All GUI and Windows-specific components have been removed.
 
+`CLAUDE.md` is a symlink to this file — edit `AGENTS.md`; both names resolve to the same content.
+
 Project uses Python 3.10+. NEVER import or use deprecated typing members like List, Union or Iterator.
 
 Secrets are stored in a .env file - NEVER read the contents of the file.
@@ -93,6 +95,8 @@ All of the above are also available as `make` targets:
   - `functional/`: Functional tests (preprocessor, batcher).
   - `TestData/`: Realistic test data fixtures.
 - `instructions/`: Translation/system instruction templates shipped with the project.
+- `tools/`: Analysis utilities — `subtitle_metrics.py` reports line lengths, CPS, and cue-count deltas, and is how translation-quality changes are validated.
+- `locales/`: gettext catalogs for user-facing (`_()`) strings.
 - `docs/`: Architecture and contributor documentation.
 - `.github/workflows/`: CI and automation workflows.
 
@@ -177,7 +181,8 @@ Consult `docs/architecture.md` for detailed information on the project architect
 
 ## Upstream Sync (Fork Maintenance)
 
-- `upstream` is the Git remote pointing to the original repo (verify with `git remote -v`). In this fork it is set to `https://github.com/machinewrapped/llm-subtrans.git`.
+- `upstream` should point at the original repo, `https://github.com/machinewrapped/llm-subtrans.git`, but it is **not configured by default** — this checkout has only `origin`. Verify with `git remote -v` and add it before syncing:
+  `git remote add upstream https://github.com/machinewrapped/llm-subtrans.git`
 - Preferred workflow for public main: merge (not rebase) to preserve history and avoid force-pushes.
 - Keep our CLI-only customizations intact: do not reintroduce GUI or Windows-specific code.
 
