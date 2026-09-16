@@ -25,6 +25,9 @@ timing_annotation_pattern = regex.compile(
 # A line consisting only of whitespace and dialog dashes carries no content of its own
 empty_after_annotation_pattern = regex.compile(r"[\s\-–—]*")
 
+# A line break the model wrote as an escape sequence, with any spaces around it
+escaped_newline_pattern = regex.compile(r" *\\[nN] *")
+
 priority_break_sequences = [
     regex.escape(dialog_marker),  # Dialog marker
     r"(?=\([^)]*\)|\[[^\]]*\])",  # Look ahead to find a complete parenthetical or bracketed block to split before
@@ -116,6 +119,20 @@ def ConvertWhitespaceBlocksToNewlines(text: str) -> str:
         text = regex.sub(r" {3,}|\，\s*", "\n", text)
 
     return text
+
+
+def ConvertEscapedNewlines(text: str | None) -> str | None:
+    """
+    Turn literal "\\n" (or the SSA "\\N") sequences that a model has written into real line breaks.
+
+    Gemini occasionally escapes the line break inside a translation. Left in place, the escape
+    reaches the delivered subtitle as visible text, and the line-length postprocessor counts it
+    as two ordinary characters and adds a second break next to it.
+    """
+    if not text or "\\" not in text:
+        return text
+
+    return escaped_newline_pattern.sub("\n", text)
 
 
 def RemoveTimingAnnotations(text: str | None) -> str | None:

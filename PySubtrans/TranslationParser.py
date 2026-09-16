@@ -7,7 +7,11 @@ from PySubtrans.Instructions import DEFAULT_TASK_TYPE
 from PySubtrans.Options import Options
 from PySubtrans.Helpers.Localization import _
 from PySubtrans.Helpers.SubtitleHelpers import MergeTranslations
-from PySubtrans.Helpers.Text import IsTextContentEqual, RemoveTimingAnnotations
+from PySubtrans.Helpers.Text import (
+    ConvertEscapedNewlines,
+    IsTextContentEqual,
+    RemoveTimingAnnotations,
+)
 from PySubtrans.SubtitleLine import SubtitleLine
 from PySubtrans.SubtitleError import (
     NoTranslationError,
@@ -141,7 +145,9 @@ class TranslationParser:
         """
         return [
             {
-                "body": RemoveTimingAnnotations(match.group("body")),
+                "body": RemoveTimingAnnotations(
+                    ConvertEscapedNewlines(match.group("body"))
+                ),
                 "number": match.groupdict().get("number"),
                 "start": match.groupdict().get("start"),
                 "end": match.groupdict().get("end"),

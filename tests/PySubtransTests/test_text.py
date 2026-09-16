@@ -3,6 +3,7 @@ import regex
 
 from PySubtrans.Helpers.TestCases import LoggedTestCase
 from PySubtrans.Helpers.Text import (
+    ConvertEscapedNewlines,
     EnsureFullWidthPunctuation,
     break_sequences,
     standard_filler_words,
@@ -426,6 +427,22 @@ class TestTextHelpers(LoggedTestCase):
                 result = EnsureFullWidthPunctuation(text)
                 self.assertLoggedEqual(
                     "fullwidth punctuation", expected, result, input_value=text
+                )
+
+
+class TestConvertEscapedNewlines(LoggedTestCase):
+    cases = [
+        ("Sopimus estää menemästä\\nlehdistöön.", "Sopimus estää menemästä\nlehdistöön."),
+        ("Yksi \\N kaksi", "Yksi\nkaksi"),
+        ("Ei mitään\nmuutettavaa", "Ei mitään\nmuutettavaa"),
+        (None, None),
+    ]
+
+    def test_ConvertEscapedNewlines(self):
+        for text, expected in self.cases:
+            with self.subTest(text=text):
+                self.assertLoggedEqual(
+                    "unescaped", expected, ConvertEscapedNewlines(text), input_value=text
                 )
 
 

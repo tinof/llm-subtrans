@@ -224,6 +224,13 @@ class TestTranslationParserSanitisation(LoggedTestCase):
         translations = self._parse(response)
         self.assertLoggedEqual("sanitised body", "ja joudun", translations[7])
 
+    def test_escaped_newline_becomes_line_break(self):
+        response = "#4\nTranslation>\nEi minun pitäisi teitä vahtia.\\nHain apua.\n"
+        translations = self._parse(response)
+        self.assertLoggedEqual(
+            "unescaped body", "Ei minun pitäisi teitä vahtia.\nHain apua.", translations[4]
+        )
+
     def test_annotation_on_header_line_is_ignored(self):
         response = "#7 [1.5s, max 22 chars]\nTranslation>\nHei maailma.\n"
         translations = self._parse(response)
