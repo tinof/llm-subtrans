@@ -602,10 +602,15 @@ def process_video_file(
     lang_code = config.get_language_code(config.target_language)
     translated_file = _build_translated_output_path(subtitle_file, lang_code)
 
-    # Check if translated file already exists
+    # Check if translated file already exists. An empty one is a failed earlier run, and
+    # skipping it would leave the episode without subtitles for good.
     if translated_file.exists():
-        logger.info(f"Skipping {video_file} - translated subtitle already exists")
-        return
+        if translated_file.stat().st_size > 0:
+            logger.info(f"Skipping {video_file} - translated subtitle already exists")
+            return
+        logger.warning(
+            f"Empty translated subtitle found, translating again: {translated_file.name}"
+        )
 
     # Extract subtitles if needed
     if not subtitle_file.exists():

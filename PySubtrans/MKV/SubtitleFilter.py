@@ -4,6 +4,10 @@ from pathlib import Path
 
 logger = logging.getLogger("exsubs")
 
+# HTML-style tags and ASS override blocks such as {\an8}: markup a viewer never sees
+MARKUP_PATTERN = re.compile(r"</?\w+[^>]*>|\{[^}]*\}")
+CUE_SEPARATOR_PATTERN = re.compile(r"\n\s*\n")
+
 
 def detect_and_convert_encoding(sub_file: Path) -> bool:
     """Detect file encoding and convert to UTF-8 if needed"""
@@ -158,8 +162,47 @@ def filter_subtitles(sub_file: Path):
             rm_style=True,
         )
         subs.save()  # Overwrites original file
+        remove_markup_only_cues(sub_file)
     except ImportError:
         logger.warning("subtitle_filter not available, skipping subtitle filtering")
     except Exception as e:
         logger.error(f"Filtering failed: {e}")
         raise
+
+
+def remove_markup_only_cues(sub_file: Path) -> int:
+    """Drop SRT cues left with no visible text, and renumber the rest.
+
+    Filtering removes sound descriptions such as "[MUSICA]" but keeps the cue, so a
+    positioned description leaves a cue holding only "{\\an8}". Translated, that becomes an
+    empty subtitle on screen. Returns the number of cues removed.
+    """
+    content = sub_file.read_text(encoding="utf-8")
+    blocks = [block for block in CUE_SEPARATOR_PATTERN.split(content.strip()) if block.strip()]
+
+    kept: list[list[str]] = []
+    removed = 0
+    for block in blocks:
+        lines = block.split("\n")
+        timing_index = next((i for i, line in enumerate(lines) if "-->" in line), None)
+        if timing_index is None:
+            kept.append(lines)
+            continue
+        text = "\n".join(lines[timing_index + 1 :])
+        if not MARKUP_PATTERN.sub("", text).strip():
+            removed += 1
+            continue
+        kept.append(lines[timing_index:])
+
+    if not removed:
+        return 0
+
+    cues = []
+    for number, lines in enumerate(kept, start=1):
+        if lines and "-->" in lines[0]:
+            cues.append("\n".join([str(number), *lines]))
+        else:
+            cues.append("\n".join(lines))
+    sub_file.write_text("\n\n".join(cues) + "\n", encoding="utf-8")
+    logger.info(f"Removed {removed} subtitle cue(s) with no visible text")
+    return removed
