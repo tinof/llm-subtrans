@@ -48,6 +48,12 @@ GEMINI_FLASH_MODEL_SUFFIX = "flash"
 FLASH_SCENE_THRESHOLD = 300.0
 FLASH_MIN_BATCH_SIZE = 100
 FLASH_MAX_BATCH_SIZE = 220
+# Gemini batches are sent concurrently by default. A blind A/B on four episodes
+# (gemini-4-argon, 2026-10-23) scored 150-line parallel batches level with one sequential
+# run of 600-line batches and 300-line parallel batches lower; 60-minute episodes went
+# from ~9 minutes to ~2.
+GEMINI_PARALLEL_MAX_BATCH_SIZE = 150
+GEMINI_PARALLEL_WORKERS = 8
 
 LANGUAGE_SUFFIX_PATTERN = regex.compile(r"^\.[a-z]{2,3}(?:-[a-z]{2,3})?$", regex.IGNORECASE)
 
@@ -350,6 +356,15 @@ def _determine_gemini_rate_limit(model: str | None) -> float:
     return GEMINI_STANDARD_RATE_LIMIT
 
 
+def _parallel_batches(mode: TranslationMode) -> bool:
+    """PARALLEL_BATCHES, else on for Gemini on Vertex. Workers do not share the RPM pacing
+    of the API-key path, so a rate-limited Gemini API key stays sequential by default."""
+    value = os.getenv("PARALLEL_BATCHES")
+    if value is not None:
+        return value.lower() in {"1", "true", "yes", "on"}
+    return mode == TranslationMode.GEMINI and _using_vertex()
+
+
 def _using_vertex() -> bool:
     value = os.getenv("GEMINI_USE_VERTEX")
     if value is None:
@@ -482,7 +497,7 @@ def translate_srt_file(
             if not os.getenv("SCENE_THRESHOLD"):
                 scene_threshold = 300.0
             if not os.getenv("MAX_BATCH_SIZE"):
-                max_batch_size = 600
+                max_batch_size = GEMINI_PARALLEL_MAX_BATCH_SIZE if _parallel_batches(mode) else 600
             if not os.getenv("MIN_BATCH_SIZE"):
                 min_batch_size = 1
 
@@ -588,6 +603,10 @@ def translate_srt_file(
         "max_batch_size": max_batch_size,
         "max_context_summaries": max_context_summaries,
         "large_context_mode": large_context_mode,
+        # Batches sent concurrently, each with source-text context instead of the
+        # translated summaries of earlier batches (SubtitleTranslator._translate_parallel).
+        "parallel_batches": _parallel_batches(mode),
+        "max_parallel_workers": int(os.getenv("MAX_PARALLEL_WORKERS") or GEMINI_PARALLEL_WORKERS),
     }
     if rate_limit:
         settings["rate_limit"] = rate_limit
@@ -604,6 +623,10 @@ def translate_srt_file(
     console.print(f"  Model: {model}")
     console.print(f"  Target Language: {effective_language}")
     console.print(f"  Temperature: {temperature}")
+    if settings["parallel_batches"]:
+        console.print(
+            f"  Batches: up to {max_batch_size} lines, {settings['max_parallel_workers']} in parallel"
+        )
     if rate_limit:
         console.print(f"  Rate Limit: {rate_limit:.0f} RPM")
     elif settings_vertex.get("use_vertex"):

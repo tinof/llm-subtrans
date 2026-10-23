@@ -1,5 +1,6 @@
 import logging
 import random
+import re
 import threading
 import time
 from typing import Any
@@ -15,6 +16,7 @@ from google.genai.types import (
     GenerateContentResponse,
     GenerateContentResponseUsageMetadata,
     HarmBlockThreshold,
+    HttpOptions,
     HarmCategory,
     Part,
     SafetySetting,
@@ -34,6 +36,10 @@ from PySubtrans.TranslationPrompt import TranslationPrompt
 from PySubtrans.TranslationRequest import TranslationRequest
 
 
+def _is_gemini_3_or_later(model: str | None) -> bool:
+    return bool(re.search(r"gemini-[3-9]", model or "", re.IGNORECASE))
+
+
 class GeminiClient(TranslationClient):
     """
     Handles communication with Google Gemini to request translations
@@ -45,6 +51,7 @@ class GeminiClient(TranslationClient):
         super().__init__(settings)
 
         self._gemini_client: genai.Client | None = None
+        self._location_clients: dict[str, genai.Client] = {}
         self._client_lock = threading.Lock()
 
         self._emit_info(
@@ -133,6 +140,30 @@ class GeminiClient(TranslationClient):
     def vertex_location(self) -> str | None:
         return self.settings.get_str("vertex_location")
 
+    @property
+    def request_timeout(self) -> float:
+        return self.settings.get_float("request_timeout") or 0.0
+
+    @property
+    def attempts_per_target(self) -> int:
+        return max(1, self.settings.get_int("attempts_per_target") or 2)
+
+    def _targets(self) -> list[tuple[str, str | None]]:
+        """
+        The configured model and location, then each "model@location" fallback in order.
+        A fallback without "@" keeps the configured location; one without a model keeps the model.
+        """
+        targets: list[tuple[str, str | None]] = [(self.model or "", self.vertex_location)]
+        for item in (self.settings.get_str("fallbacks") or "").split(","):
+            item = item.strip()
+            if not item:
+                continue
+            model, _sep, location = item.partition("@")
+            target = (model.strip() or targets[0][0], location.strip() or self.vertex_location)
+            if target not in targets:
+                targets.append(target)
+        return targets
+
     def _request_translation(
         self, request: TranslationRequest, temperature: float | None = None
     ) -> Translation | None:
@@ -166,9 +197,26 @@ class GeminiClient(TranslationClient):
         if not self.model:
             raise TranslationImpossibleError(_("No model specified"))
 
+        targets = self._targets()
         for retry in range(1 + self.max_retries):
+            # Each target gets attempts_per_target tries; the last one keeps the rest.
+            index = min(retry // self.attempts_per_target, len(targets) - 1)
+            model, location = targets[index]
+            if index and retry == index * self.attempts_per_target:
+                self._emit_warning(
+                    _("Gemini {model} unavailable, falling back to {fallback}").format(
+                        model=targets[index - 1][0], fallback=f"{model}@{location}"
+                    )
+                )
+            # The scripts pick a temperature for the configured model (Gemini 3+ must keep its
+            # default); a fallback from another generation gets the model default instead.
+            target_temperature = (
+                temperature
+                if _is_gemini_3_or_later(model) == _is_gemini_3_or_later(targets[0][0])
+                else None
+            )
             try:
-                return self._get_gemini_response(request, temperature)
+                return self._get_gemini_response(request, target_temperature, model, location)
 
             except TranslationImpossibleError:
                 raise
@@ -187,11 +235,13 @@ class GeminiClient(TranslationClient):
                         _(
                             "Failed to communicate with provider after {max_retries} retries"
                         ).format(max_retries=self.max_retries)
-                    )
+                    ) from e
 
                 if not self.aborted:
-                    # Truncated exponential backoff with jitter, per Google's 429 guidance
-                    base_delay = min(self.backoff_time * 2.0**retry, 60.0)
+                    # Truncated exponential backoff with jitter, per Google's 429 guidance.
+                    # The backoff restarts on each target: a fallback is another capacity pool.
+                    attempt_on_target = retry - index * self.attempts_per_target
+                    base_delay = min(self.backoff_time * 2.0**attempt_on_target, 60.0)
                     sleep_time = round(
                         base_delay + random.uniform(0.0, base_delay * 0.5), 1
                     )
@@ -203,19 +253,24 @@ class GeminiClient(TranslationClient):
                     time.sleep(sleep_time)
 
     def _get_gemini_response(
-        self, request: TranslationRequest, temperature: float
+        self,
+        request: TranslationRequest,
+        temperature: float | None,
+        model: str | None = None,
+        location: str | None = None,
     ) -> dict[str, Any] | None:
         """
         Handle both streaming and non-streaming Gemini API calls
         """
-        if not self.model:
+        model = model or self.model
+        if not model:
             raise TranslationImpossibleError(_("No model specified"))
 
         prompt: TranslationPrompt = request.prompt
         if not isinstance(prompt.content, str):
             raise TranslationImpossibleError(_("Content must be a string for Gemini"))
 
-        gemini_client = self._get_client()
+        gemini_client = self._get_client(location)
         config = GenerateContentConfig(
             candidate_count=1,
             temperature=temperature,
@@ -230,7 +285,7 @@ class GeminiClient(TranslationClient):
         if not request.is_streaming or not self.enable_streaming:
             # Non-streaming: single request
             gcr = gemini_client.models.generate_content(
-                model=self.model,
+                model=model,
                 contents=Part.from_text(text=prompt.content),
                 config=config,
             )
@@ -239,7 +294,7 @@ class GeminiClient(TranslationClient):
 
         # Streaming: process chunks and create complete response
         stream = gemini_client.models.generate_content_stream(
-            model=self.model,
+            model=model,
             contents=Part.from_text(text=prompt.content),
             config=config,
         )
@@ -395,9 +450,12 @@ class GeminiClient(TranslationClient):
 
         return response
 
-    def _create_client(self):
+    def _create_client(self, location: str | None = None):
+        # No SDK retries: _send_messages owns retries, backoff and fallbacks
+        http_options = HttpOptions(timeout=int(self.request_timeout * 1000) or None)
         if self.use_vertex:
-            if not self.vertex_project or not self.vertex_location:
+            location = location or self.vertex_location
+            if not self.vertex_project or not location:
                 raise TranslationImpossibleError(
                     _("Vertex AI project and location must be provided")
                 )
@@ -405,24 +463,31 @@ class GeminiClient(TranslationClient):
             return genai.Client(
                 vertexai=True,
                 project=self.vertex_project,
-                location=self.vertex_location,
+                location=location,
+                http_options=http_options,
             )
 
         if not self.api_key:
             raise TranslationImpossibleError(_("API Key is required"))
 
-        return genai.Client(
-            api_key=self.api_key, http_options={"api_version": "v1alpha"}
-        )
+        http_options.api_version = "v1alpha"
+        return genai.Client(api_key=self.api_key, http_options=http_options)
 
-    def _get_client(self) -> genai.Client:
+    def _get_client(self, location: str | None = None) -> genai.Client:
         """
-        Create the genai client on first use and reuse it for subsequent requests
+        Create the genai client for a location on first use and reuse it for subsequent requests
         """
+        location = location or self.vertex_location
         with self._client_lock:
-            if self._gemini_client is None:
-                self._gemini_client = self._create_client()
-            return self._gemini_client
+            if location == self.vertex_location:
+                if self._gemini_client is None:
+                    self._gemini_client = self._create_client(location)
+                return self._gemini_client
+            client = self._location_clients.get(location or "")
+            if client is None:
+                client = self._create_client(location)
+                self._location_clients[location or ""] = client
+            return client
 
     def _extract_block_info(self, gcr: GenerateContentResponse) -> str:
         """

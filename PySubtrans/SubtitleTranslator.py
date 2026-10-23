@@ -248,7 +248,10 @@ class SubtitleTranslator:
             _("Translating {count} batches in parallel").format(count=len(batches_to_translate))
         )
 
-        # Translate batches in parallel
+        # Translate batches in parallel. A TranslationImpossibleError (the provider refused
+        # or retries ran out) ends the run as it does in sequential mode, instead of
+        # returning a partial translation.
+        impossible: TranslationImpossibleError | None = None
         with ThreadPoolExecutor(max_workers=self.max_parallel_workers) as executor:
             # Submit all translation tasks
             future_to_batch = {
@@ -264,11 +267,20 @@ class SubtitleTranslator:
                 if self.aborted:
                     break
 
+                if future.cancelled():
+                    continue  # never started: a fatal error cancelled it
+
                 scene, batch = future_to_batch[future]
                 try:
                     future.result()
                     # Emit batch translated event
                     self.events.batch_translated.send(self, batch=batch)
+                except TranslationImpossibleError as e:
+                    batch.errors.append(e)
+                    self.errors.append(e)
+                    impossible = impossible or e
+                    for pending in future_to_batch:
+                        pending.cancel()
                 except TranslationError as e:
                     self._emit_warning(
                         _("Error translating scene {scene} batch {batch}: {error}").format(
@@ -288,6 +300,9 @@ class SubtitleTranslator:
                     self.errors.append(TranslationError(str(e)))
                     if self.stop_on_error:
                         break
+
+        if impossible is not None:
+            raise impossible
 
         # Emit scene_translated events for all scenes that had batches translated
         translated_scenes = set()

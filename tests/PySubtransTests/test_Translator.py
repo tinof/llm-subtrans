@@ -1,4 +1,5 @@
 from copy import deepcopy
+from unittest.mock import patch
 
 from PySubtrans.Helpers.Parse import ParseNames
 from PySubtrans.Helpers.TestCases import (
@@ -11,6 +12,7 @@ from PySubtrans.SubtitleBatch import SubtitleBatch
 from PySubtrans.SubtitleBatcher import SubtitleBatcher
 from PySubtrans.SubtitleEditor import SubtitleEditor
 from PySubtrans.Subtitles import Subtitles
+from PySubtrans.SubtitleError import TranslationImpossibleError
 from PySubtrans.SubtitleScene import SubtitleScene
 from PySubtrans.SubtitleTranslator import SubtitleTranslator
 from PySubtrans.TranslationEvents import TranslationEvents
@@ -73,6 +75,25 @@ class SubtitleTranslatorTests(SubtitleTestCase):
             )
 
             translator.TranslateSubtitles(originals)
+
+    def test_parallel_mode_raises_when_translation_is_impossible(self):
+        """A refused request ends a parallel run, as in sequential mode, instead of a partial result."""
+        data = chinese_dinner_data
+        originals: Subtitles = PrepareSubtitles(data, "original")
+        options = deepcopy(self.options)
+        options.update({"parallel_batches": True, "max_parallel_workers": 2, "max_batch_size": 20})
+        with SubtitleEditor(originals) as editor:
+            editor.AutoBatch(SubtitleBatcher(options))
+
+        translator = SubtitleTranslator(options, translation_provider=DummyProvider(data=data))
+        refused = TranslationImpossibleError("Gemini request failed: 403 PERMISSION_DENIED")
+
+        with patch.object(translator.client, "RequestTranslation", side_effect=refused):
+            with self.assertRaises(TranslationImpossibleError):
+                translator.TranslateSubtitles(originals)
+
+        # Batches cancelled by the failure are not reported as errors of their own
+        self.assertTrue(all(isinstance(e, TranslationImpossibleError) for e in translator.errors))
 
     def validate_batch(
         self, batch: SubtitleBatch, original: Subtitles, reference: Subtitles
