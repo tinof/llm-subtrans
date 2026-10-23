@@ -25,6 +25,10 @@ timing_annotation_pattern = regex.compile(
 # A line consisting only of whitespace and dialog dashes carries no content of its own
 empty_after_annotation_pattern = regex.compile(r"[\s\-–—]*")
 
+# Response-format markers from the prompt template ("Original>", "Translation>") which a model
+# sometimes repeats inside a translation body
+prompt_marker_pattern = regex.compile(r"\b(?:Original|Translation)>")
+
 # A line break the model wrote as an escape sequence, with any spaces around it
 escaped_newline_pattern = regex.compile(r" *\\[nN] *")
 
@@ -148,6 +152,44 @@ def RemoveTimingAnnotations(text: str | None) -> str | None:
     # Matched against the whole text rather than line by line, because a model that wraps
     # a long line can split the annotation across a newline
     remainder = timing_annotation_pattern.sub("", text)
+
+    if remainder == text:
+        return text
+
+    lines: list[str] = [
+        regex.sub(r" {2,}", " ", line).strip()
+        for line in remainder.split("\n")
+        if not empty_after_annotation_pattern.fullmatch(line)
+    ]
+
+    return "\n".join(lines)
+
+
+def RemovePromptMarkers(text: str | None) -> str | None:
+    """
+    Strip "Original>" / "Translation>" markers that a model has repeated into a translation.
+
+    Lines that contain nothing but a marker are removed entirely, otherwise the marker is cut
+    out and the remaining text on the line is preserved.
+
+    An "Original>" block inside the body is source text, never translation: everything from it
+    on is dropped, unless nothing precedes it, in which case only the text after the last
+    "Translation>" is kept.
+    """
+    if not text or ">" not in text:
+        return text
+
+    kept = text
+    original_at = kept.find("Original>")
+    if original_at >= 0:
+        before = prompt_marker_pattern.sub("", kept[:original_at]).strip(" \n-–—")
+        if before:
+            kept = kept[:original_at]
+        else:
+            translation_at = kept.rfind("Translation>")
+            kept = kept[translation_at:] if translation_at > original_at else ""
+
+    remainder = prompt_marker_pattern.sub("", kept)
 
     if remainder == text:
         return text

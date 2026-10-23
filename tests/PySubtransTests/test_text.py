@@ -19,6 +19,7 @@ from PySubtrans.Helpers.Text import (
     Linearise,
     NormaliseDialogTags,
     RemoveFillerWords,
+    RemovePromptMarkers,
     RemoveTimingAnnotations,
     RemoveWhitespaceAndPunctuation,
     SanitiseSummary,
@@ -484,6 +485,31 @@ class TestRemoveTimingAnnotations(LoggedTestCase):
                 result = RemoveTimingAnnotations(text)
                 self.assertLoggedEqual(
                     "timing annotations removed", expected, result, input_value=text
+                )
+
+
+class TestRemovePromptMarkers(LoggedTestCase):
+    prompt_marker_cases = [
+        ("Älä yritä.\nTranslation>", "Älä yritä."),
+        ("Translation>\nÄlä yritä.", "Älä yritä."),
+        ("Älä yritä. Translation> Älä", "Älä yritä. Älä"),
+        ("Original>\nDon't try.\nTranslation>\nÄlä yritä.", "Älä yritä."),
+        # A missing "#N" header: the next cue's source and translation leaked into this body
+        ("Älä yritä.\nOriginal>\nDon't pretend.\nTranslation>\nÄlä teeskentele.", "Älä yritä."),
+        ("Original>\nDon't try.", ""),
+        ("- Kuka?\n- Translation>", "- Kuka?"),
+        ("Hän sanoi -> ei", "Hän sanoi -> ei"),
+        ("Tavallinen rivi", "Tavallinen rivi"),
+        ("", ""),
+        (None, None),
+    ]
+
+    def test_RemovePromptMarkers(self):
+        for text, expected in self.prompt_marker_cases:
+            with self.subTest(text=text):
+                result = RemovePromptMarkers(text)
+                self.assertLoggedEqual(
+                    "prompt markers removed", expected, result, input_value=text
                 )
 
 

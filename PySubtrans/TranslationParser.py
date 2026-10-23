@@ -10,6 +10,7 @@ from PySubtrans.Helpers.SubtitleHelpers import MergeTranslations
 from PySubtrans.Helpers.Text import (
     ConvertEscapedNewlines,
     IsTextContentEqual,
+    RemovePromptMarkers,
     RemoveTimingAnnotations,
 )
 from PySubtrans.SubtitleLine import SubtitleLine
@@ -31,6 +32,9 @@ default_pattern = (
     r"(?:[\s\r\n]?(?P<body>[\s\S]*?))?"
     r"(?=\n#\d|\Z)"
 )
+
+# A merge tag the model wrote anywhere in a line; never subtitle text
+merge_tag_pattern = regex.compile(r"\[MERGE\s+\d+\+\d+\]\s*")
 
 fallback_patterns = [
     line_number_pattern
@@ -145,8 +149,8 @@ class TranslationParser:
         """
         return [
             {
-                "body": RemoveTimingAnnotations(
-                    ConvertEscapedNewlines(match.group("body"))
+                "body": RemovePromptMarkers(
+                    RemoveTimingAnnotations(ConvertEscapedNewlines(match.group("body")))
                 ),
                 "number": match.groupdict().get("number"),
                 "start": match.groupdict().get("start"),
@@ -179,25 +183,32 @@ class TranslationParser:
 
             translation: SubtitleLine | None = self.translations.get(item.key)
 
-            if translation:
+            # A body that sanitising left empty counts as untranslated, so it is retried
+            if translation and translation.text:
                 # Check for MERGE tag
                 # Format: [MERGE startID+endID]
                 merge_match = regex.match(
-                    r"^\[MERGE\s+(?P<start>\d+)\+(?P<end>\d+)\]\s*(?P<text>.*)",
+                    r"^(?P<dash>[-–—]\s*)?\[MERGE\s+(?P<start>\d+)\+(?P<end>\d+)\]\s*(?P<text>.*)",
                     translation.text,
                     regex.DOTALL,
                 )
+                merge_applied = False
 
                 if merge_match:
                     start_id = int(merge_match.group("start"))
                     end_id = int(merge_match.group("end"))
-                    translation_text = merge_match.group("text")
+                    # The tag is never subtitle text, whether or not the merge can be applied.
+                    # A dialog dash written before the tag is kept unless the text repeats it.
+                    merged_text = merge_match.group("text")
+                    if merge_match.group("dash") and not merged_text.startswith(("-", "–", "—")):
+                        merged_text = merge_match.group("dash") + merged_text
+                    translation.text = merged_text
 
-                    if start_id == item.number and end_id in original_map:
+                    if start_id == item.number and end_id in original_map and end_id > start_id:
+                        merge_applied = True
                         # Calculate new end time
                         end_line = original_map[end_id]
                         translation.end = end_line.end
-                        translation.text = translation_text
 
                         # Mark intermediate lines as merged
                         # We assume sequential IDs for now, but we should probably handle gaps if possible
@@ -207,11 +218,20 @@ class TranslationParser:
                                 merged_ids.add(i)
                                 # Optionally mark the original line as having a "merged" translation for debugging
                                 original_map[i].translation = "[MERGED]"
+                    else:
+                        logging.warning(
+                            f"Ignoring merge tag [MERGE {start_id}+{end_id}] on line {item.number}: "
+                            "it does not start at this line or its last line is not in the batch"
+                        )
+
+                # A tag anywhere else (a second dialog line, inside italics) cannot apply a merge
+                if translation.text and "[MERGE" in translation.text:
+                    translation.text = merge_tag_pattern.sub("", translation.text).strip()
 
                 translation.number = item.number
                 translation.start = item.start or timedelta(seconds=0)
-                # If it wasn't a merge, end time is just item.end. If it was a merge, we already updated it.
-                if not merge_match:
+                # Unless a merge was applied, the line keeps its own end time
+                if not merge_applied:
                     translation.end = item.end or timedelta(seconds=0)
 
                 translation.metadata = item.metadata

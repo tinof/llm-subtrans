@@ -1,4 +1,5 @@
 import unittest
+from datetime import timedelta
 from enum import Enum
 
 import regex
@@ -8,6 +9,7 @@ from PySubtrans.Helpers.Parse import ParseDelayFromHeader, ParseNames
 from PySubtrans.Helpers.TestCases import LoggedTestCase
 from PySubtrans.Instructions import DEFAULT_TASK_TYPE
 from PySubtrans.Options import Options
+from PySubtrans.SubtitleLine import SubtitleLine
 from PySubtrans.Translation import Translation
 from PySubtrans.TranslationParser import (
     TranslationParser,
@@ -235,6 +237,69 @@ class TestTranslationParserSanitisation(LoggedTestCase):
         response = "#7 [1.5s, max 22 chars]\nTranslation>\nHei maailma.\n"
         translations = self._parse(response)
         self.assertLoggedEqual("unaffected body", "Hei maailma.", translations[7])
+
+    def test_repeated_translation_marker_is_removed(self):
+        response = (
+            "#142\nTranslation>\nÄlä yritä.\nTranslation>\n\n#143\nTranslation>\nÄlä teeskentele.\n"
+        )
+        translations = self._parse(response)
+        self.assertLoggedEqual("marker line removed", "Älä yritä.", translations[142])
+        self.assertLoggedEqual("next line intact", "Älä teeskentele.", translations[143])
+
+
+class TestMergeTagMatching(LoggedTestCase):
+    """A [MERGE a+b] tag either extends the line's timing or is dropped, never shipped as text"""
+
+    def _match(self, response: str) -> dict[int, tuple[str, float]]:
+        originals = [
+            SubtitleLine.Construct(
+                number,
+                timedelta(seconds=number * 2),
+                timedelta(seconds=number * 2 + 1.5),
+                f"line {number}",
+            )
+            for number in (10, 11, 12, 13)
+        ]
+        parser = TranslationParser(DEFAULT_TASK_TYPE, Options())
+        parser.ProcessTranslation(Translation({"text": response}), validate=False)
+        matched, _ = parser.MatchTranslations(originals)
+        return {line.number: (line.text, line.end.total_seconds()) for line in matched}
+
+    def test_valid_merge_extends_timing_and_drops_merged_line(self):
+        result = self._match(
+            "#10\nTranslation>\nEka\n\n#11\nTranslation>\n[MERGE 11+12] Yhdistetty\n\n#13\nTranslation>\nVika\n"
+        )
+        self.assertLoggedEqual("merged text", ("Yhdistetty", 25.5), result[11])
+        self.assertLoggedFalse("merged line dropped", 12 in result)
+
+    def test_merge_that_cannot_apply_keeps_own_timing(self):
+        result = self._match("#11\nTranslation>\n[MERGE 14+15] Väärä tunniste\n")
+        self.assertLoggedEqual("tag stripped, own end kept", ("Väärä tunniste", 23.5), result[11])
+
+    def test_merge_beyond_batch_keeps_own_timing(self):
+        result = self._match("#13\nTranslation>\n[MERGE 13+14] Viimeinen\n")
+        self.assertLoggedEqual("tag stripped, own end kept", ("Viimeinen", 27.5), result[13])
+
+    def test_marker_only_body_is_unmatched_not_a_crash(self):
+        result = self._match("#11\nTranslation>\nTranslation>\n\n#12\nTranslation>\nToka\n")
+        self.assertLoggedFalse("empty line left unmatched", 11 in result)
+        self.assertLoggedEqual("next line intact", "Toka", result[12][0])
+
+    def test_tag_not_at_start_is_stripped(self):
+        result = self._match("#11\nTranslation>\n- Kuka?\n- [MERGE 11+12] Niin.\n")
+        self.assertLoggedEqual("second-line tag removed", "- Kuka?\n- Niin.", result[11][0])
+        result = self._match("#11\nTranslation>\n<i>[MERGE 11+12] Niin.</i>\n")
+        self.assertLoggedEqual("italic tag removed", "<i>Niin.</i>", result[11][0])
+
+    def test_en_dash_before_tag_applies_merge(self):
+        result = self._match("#11\nTranslation>\n– [MERGE 11+12] Niin.\n")
+        self.assertLoggedEqual("merged with dash", ("– Niin.", 25.5), result[11])
+
+    def test_dash_before_tag_is_kept_once(self):
+        result = self._match("#11\nTranslation>\n- [MERGE 11+12] Arvostettiin?\n- Niin.\n")
+        self.assertLoggedEqual("dash kept", "- Arvostettiin?\n- Niin.", result[11][0])
+        result = self._match("#11\nTranslation>\n- [MERGE 11+12] - Arvostettiin?\n- Niin.\n")
+        self.assertLoggedEqual("dash not doubled", "- Arvostettiin?\n- Niin.", result[11][0])
 
 
 if __name__ == "__main__":
