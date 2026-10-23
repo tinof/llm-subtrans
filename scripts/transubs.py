@@ -146,9 +146,21 @@ def _normalise_translated_output(
     return desired_file
 
 
+def _sisusub_ai_review_enabled() -> bool:
+    """Whether fix-finnish-subs may run its AI review pass (off unless SISUSUB_AI_REVIEW is true).
+
+    The AI pass made one Gemini call per flagged cue and took ~12 minutes and ~$1.50 per
+    episode; see sisusub's docs/pipeline-review-2026-10-23.md. The deterministic fixes still run.
+    """
+    return (os.getenv("SISUSUB_AI_REVIEW") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _run_finnish_subtitle_fixer(translated_file: Path) -> int:
     """Run fix-finnish-subs once and return its exit status."""
-    result = subprocess.run(["fix-finnish-subs", str(translated_file)], check=False)
+    command = ["fix-finnish-subs", str(translated_file)]
+    if not _sisusub_ai_review_enabled():
+        command.insert(1, "--no-ai-review")
+    result = subprocess.run(command, check=False)
     return result.returncode
 
 
@@ -563,6 +575,10 @@ def translate_srt_file(
         # translation, so each numbered line has a budget the model can actually meet.
         "merge_continuation_duration": 1.5,
         "merge_continuation_gap": 0.3,
+        # Never split a cue by duration before translation (the Options default splits at
+        # 4 s). It added ~30 lines per episode and handed the model sentence fragments,
+        # without fixing any timing: text and time are divided in the same proportion.
+        "max_line_duration": 0.0,
         # Reject batches where a translation blows its display-time budget - the signature
         # of content shifted onto the wrong line number - and retry them.
         "max_translation_cps": 25.0,
