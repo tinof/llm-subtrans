@@ -18,10 +18,16 @@ from PySubtrans.Helpers.Text import (
     EnsureFullWidthPunctuation,
     NormaliseDialogTags,
     RemoveFillerWords,
+    StripMarkup,
 )
 from PySubtrans.Options import SettingsType
 from PySubtrans.SettingsType import SettingsType
 from PySubtrans.SubtitleLine import SubtitleLine
+
+# Closing quotes and brackets that may follow the punctuation that ends a sentence
+_closing_punctuation = "\"'”’»)"
+
+_italic_span_pattern = regex.compile(r"<i>.*?</i>", regex.IGNORECASE | regex.DOTALL)
 
 
 class SubtitleProcessor:
@@ -394,7 +400,10 @@ class SubtitleProcessor:
 
         A cue is only absorbed when it plausibly continues the previous cue: the previous
         text does not end a sentence, the gap between cues is small, neither cue is a
-        two-speaker dialogue cue, and the merged cue stays within sane display limits.
+        two-speaker dialogue cue, both cues are in the same voice (italic or not), and the
+        merged cue stays within sane display limits.
+
+        The merged text is one flowing line: line breaks are re-added after translation.
         """
         if not lines:
             return []
@@ -407,7 +416,7 @@ class SubtitleProcessor:
 
         for line in lines[1:]:
             if self._is_continuation(current_line, line, max_merged_duration, max_merged_length):
-                current_line.text = f"{current_line.text} {line.text}"
+                current_line.text = _join_continuation(current_line.text, line.text)
                 current_line.end = line.end
             else:
                 merged_lines.append(current_line)
@@ -432,10 +441,14 @@ class SubtitleProcessor:
         if line.duration >= self.merge_continuation_duration:
             return False
 
-        if current_line.text_normalized[-1] in sentence_end_punctuation:
+        if _ends_sentence(current_line.text_normalized):
             return False
 
         if self.dialog_marker in current_line.text or self.dialog_marker in line.text:
+            return False
+
+        # An italic cue is usually another voice (off-screen, phone, TV)
+        if _is_italic_cue(current_line.text_normalized) != _is_italic_cue(line.text_normalized):
             return False
 
         if (
@@ -453,8 +466,9 @@ class SubtitleProcessor:
         if line.end - current_line.start > max_merged_duration:
             return False
 
-        merged_length = len(current_line.text) + len(line.text) + 1
-        if merged_length > max_merged_length:
+        # Count what the viewer sees, so markup does not use up the two-line budget
+        merged_text = _join_continuation(current_line.text_normalized, line.text_normalized)
+        if len(StripMarkup(merged_text)) > max_merged_length:
             return False
 
         return True
@@ -468,3 +482,38 @@ class SubtitleProcessor:
         self._compiled_break_sequences = [
             regex.compile(seq) for seq in self.break_sequences
         ]
+
+
+def _ends_sentence(text: str) -> bool:
+    """
+    Check whether the visible text ends a sentence, ignoring markup and closing quotes or brackets
+    """
+    visible = StripMarkup(text).rstrip()
+    # A bracketed sound tag ("[door slams]") stands on its own
+    if visible.endswith("]"):
+        return True
+    visible = visible.rstrip(_closing_punctuation).rstrip()
+    return bool(visible) and regex.search(f"{sentence_end_punctuation}$", visible) is not None
+
+
+def _is_italic_cue(text: str) -> bool:
+    """
+    Check whether all the visible text of a cue is in italics (e.g. <i>On the phone</i>)
+    """
+    if not _italic_span_pattern.search(text):
+        return False
+    return not StripMarkup(_italic_span_pattern.sub("", text)).strip()
+
+
+def _join_continuation(text: str, continuation: str) -> str:
+    """
+    Join a continuation to a cue as one flowing text, without inner line breaks
+    """
+    text = text.strip()
+    continuation = continuation.strip()
+
+    # Fold two italic cues into one italic span
+    if text.lower().endswith("</i>") and continuation.lower().startswith("<i>"):
+        text, continuation = text[: -len("</i>")], continuation[len("<i>") :]
+
+    return " ".join(f"{text} {continuation}".split())

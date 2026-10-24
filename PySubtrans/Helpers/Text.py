@@ -457,6 +457,17 @@ def ContainsTags(text: str) -> bool:
     return regex.search(r"<[^>]+>", text) is not None
 
 
+# HTML-style tags and ASS override blocks such as {\an8}: markup a viewer never sees
+markup_pattern = regex.compile(r"</?\w+[^>]*>|\{[^}]*\}")
+
+
+def StripMarkup(text: str) -> str:
+    """
+    Remove html-like tags (<i>, <font ...>) and ASS override blocks ({\\an8}) from the text
+    """
+    return markup_pattern.sub("", text)
+
+
 def ExtractTag(tagname: str, text: str) -> tuple[str, str | None]:
     """
     Look for an xml-like tag in the input text, and extract the contents.

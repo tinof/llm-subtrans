@@ -2,10 +2,11 @@ import logging
 import regex as re
 from pathlib import Path
 
+from PySubtrans.Helpers.Text import markup_pattern
+
 logger = logging.getLogger("exsubs")
 
-# HTML-style tags and ASS override blocks such as {\an8}: markup a viewer never sees
-MARKUP_PATTERN = re.compile(r"</?\w+[^>]*>|\{[^}]*\}")
+MARKUP_PATTERN = markup_pattern
 CUE_SEPARATOR_PATTERN = re.compile(r"\n\s*\n")
 
 

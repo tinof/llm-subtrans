@@ -111,3 +111,92 @@ class TestMergeContinuationLines(LoggedTestCase):
         result = self._processor().PreprocessSubtitles(lines)
         self.assertLoggedEqual("line count", 2, len(result))
         self.assertLoggedEqual("line numbers", [1, 2], [line.number for line in result])
+
+    def test_does_not_merge_after_sentence_end_inside_markup(self):
+        for text, continuation in (
+            ("<i>No, call your cousin.</i>", "<i>I'll do it</i>"),
+            ('"We are done here."', "I'll do it"),
+            ("{\\an8}<i>Did you hear that?</i>", "<i>I'll do it</i>"),
+            ("<font color=\"#ffff00\">That's enough!</font>", "I'll do it"),
+        ):
+            lines = [
+                _line(1, "00:00:00,000", "00:00:02,000", text),
+                _line(2, "00:00:02,000", "00:00:03,000", continuation),
+            ]
+            result = self._processor().PreprocessSubtitles(lines)
+            self.assertLoggedEqual(f"line count after {text!r}", 2, len(result))
+
+    def test_does_not_merge_italic_with_roman(self):
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "<i>If you can hear me,</i>"),
+            _line(2, "00:00:02,000", "00:00:03,000", "call me back"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("roman after italic", 2, len(result))
+
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "If you can hear me,"),
+            _line(2, "00:00:02,000", "00:00:03,000", "<i>call me back</i>"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("italic after roman", 2, len(result))
+
+    def test_merges_italic_cues_into_one_span(self):
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "<i>If you can hear me,</i>"),
+            _line(2, "00:00:02,000", "00:00:03,000", "<i>call me back</i>"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("line count", 1, len(result))
+        self.assertLoggedEqual(
+            "merged text", "<i>If you can hear me, call me back</i>", result[0].text
+        )
+
+    def test_merged_text_has_no_inner_line_breaks(self):
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "you would recommend\nyour father-in-law's"),
+            _line(2, "00:00:02,000", "00:00:03,000", "fund\nin Shanghai?"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("line count", 1, len(result))
+        self.assertLoggedEqual(
+            "merged text",
+            "you would recommend your father-in-law's fund in Shanghai?",
+            result[0].text,
+        )
+
+    def test_length_cap_counts_visible_text(self):
+        first = "a" * 40 + ","
+        second = "b" * 40
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", f"<i>{first}</i>"),
+            _line(2, "00:00:02,000", "00:00:03,000", f"<i>{second}</i>"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("line count", 1, len(result))
+        self.assertLoggedEqual("merged text", f"<i>{first} {second}</i>", result[0].text)
+
+    def test_length_cap_rejects_long_visible_text(self):
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "a" * 45 + ","),
+            _line(2, "00:00:02,000", "00:00:03,000", "b" * 45),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("line count", 2, len(result))
+
+    def test_sound_tag_is_not_merged_with_speech(self):
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "[door slams]"),
+            _line(2, "00:00:02,000", "00:00:03,000", "Who's there?"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("line count", 2, len(result))
+
+    def test_unmerged_cues_keep_their_line_breaks(self):
+        lines = [
+            _line(1, "00:00:00,000", "00:00:02,000", "China is a partner,\nnot a threat."),
+            _line(2, "00:00:02,000", "00:00:03,000", "15 million?"),
+        ]
+        result = self._processor().PreprocessSubtitles(lines)
+        self.assertLoggedEqual("line count", 2, len(result))
+        self.assertLoggedEqual("first text", "China is a partner,\nnot a threat.", result[0].text)
